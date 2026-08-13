@@ -1,0 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base Reset ──────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #06060f;
+  color: #e2e2f0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0a0a18; }
+::-webkit-scrollbar-thumb { background: #272750; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #333368; }
+
+/* ─── Components ─────────────────────────────────────────────────────────── */
+@layer components {
+  .card {
+    @apply bg-surface-800 border border-surface-600/50 rounded-2xl;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%230f0f24'/%3E%3Crect x='0' y='0' width='1' height='1' fill='%23161630'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%23161630'/%3E%3C/svg%3E");
+  }
+
+  .card-elevated {
+    @apply card shadow-2xl;
+    box-shadow:
+      0 25px 50px -12px rgba(0, 0, 0, 0.6),
+      0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  }
+
+  .btn-primary {
+    @apply bg-fire-gradient font-rajdhani font-bold tracking-widest uppercase
+           px-8 py-3 rounded-xl text-white transition-all duration-200
+           hover:brightness-110 hover:shadow-lg active:scale-95;
+    box-shadow: 0 4px 20px rgba(249, 115, 22, 0.35);
+  }
+
+  .btn-ghost {
+    @apply bg-surface-700 border border-surface-500/60 font-inter font-medium
+           px-5 py-2.5 rounded-xl text-slate-300 text-sm transition-all duration-200
+           hover:bg-surface-600 hover:border-surface-400/60 hover:text-white
+           active:scale-95;
+  }
+
+  .badge-upcoming {
+    @apply bg-surface-600 text-slate-400 border border-surface-500/60
+           text-xs font-inter font-semibold uppercase tracking-widest
+           px-2.5 py-0.5 rounded-full;
+  }
+  .badge-active {
+    @apply bg-fire-500/15 text-fire-400 border border-fire-500/40
+           text-xs font-inter font-semibold uppercase tracking-widest
+           px-2.5 py-0.5 rounded-full;
+  }
+  .badge-sold {
+    @apply bg-gold-500/15 text-gold-400 border border-gold-500/40
+           text-xs font-inter font-semibold uppercase tracking-widest
+           px-2.5 py-0.5 rounded-full;
+  }
+
+  .input-field {
+    @apply w-full bg-surface-700 border border-surface-500/60 rounded-xl
+           px-4 py-3 text-white font-inter placeholder:text-muted
+           focus:outline-none focus:border-fire-500/70 focus:ring-1 focus:ring-fire-500/30
+           transition-all duration-200;
+  }
+
+  .stat-label {
+    @apply text-xs font-inter text-muted uppercase tracking-widest;
+  }
+  .stat-value {
+    @apply text-2xl font-rajdhani font-bold text-white;
+  }
+
+  /* Noise/grain texture overlay */
+  .noise::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+}
+
+/* ─── Utilities ──────────────────────────────────────────────────────────── */
+@layer utilities {
+  .text-gradient-fire {
+    background: linear-gradient(135deg, #fb923c, #f97316, #ea580c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .text-gradient-gold {
+    background: linear-gradient(135deg, #fde68a, #fbbf24, #f59e0b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .glow-fire {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.4), 0 0 60px rgba(249, 115, 22, 0.1);
+  }
+  .glow-gold {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.4), 0 0 60px rgba(245, 158, 11, 0.1);
+  }
+}

@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Free Fire Auction — Firebase Storage Security Rules
+//
+//  BEFORE DEPLOYING:
+//    1. Replace ADMIN_UID_PLACEHOLDER with your admin account's Firebase Auth UID
+//       (same UID used in firestore.rules and AuthContext.jsx).
+//    2. Deploy: firebase deploy --only storage
+//
+//  Access model:
+//    • Any authenticated user may READ any file in /player_photos/ (for display).
+//    • Only the admin UID may WRITE (upload, overwrite) to /player_photos/.
+//    • All other paths are denied.
+//    • File size capped at 5 MB. Only image MIME types are accepted.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── Player photo uploads ─────────────────────────────────────────────
+    match /player_photos/{imageId} {
+
+      // Any signed-in user can download/display player photos
+      allow read: if request.auth != null;
+
+      // Only the designated admin account may upload or replace photos
+      allow write: if request.auth != null
+                   && request.auth.uid == 'ADMIN_UID_PLACEHOLDER'
+                   // Must be an image MIME type
+                   && request.resource.contentType.matches('image/.*')
+                   // Cap at 5 MB (5 * 1024 * 1024 bytes)
+                   && request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // ── Catch-all: deny everything else ──────────────────────────────────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

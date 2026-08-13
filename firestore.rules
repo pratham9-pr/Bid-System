@@ -1,0 +1,127 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Free Fire Auction — Firestore Security Rules
+//
+//  BEFORE DEPLOYING:
+//    1. Replace ADMIN_UID_PLACEHOLDER with your admin account's Firebase Auth UID.
+//       Find it: Firebase Console → Authentication → Users → UID column.
+//    2. Deploy: firebase deploy --only firestore:rules
+//
+//  Architecture note:
+//    The `placeBid` function runs as a client-side Firestore Transaction.
+//    These rules are carefully crafted to allow the transaction's writes while
+//    blocking arbitrary direct writes. For maximum security in production,
+//    consider migrating `placeBid` to a Firebase Cloud Function (server-side
+//    Admin SDK bypasses all rules).
+// ─────────────────────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ────────────────────────────────────────────────────
+
+    /** True if the request comes from a signed-in Firebase Auth user. */
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    /** True if the caller is the designated admin account. */
+    function isAdmin() {
+      return request.auth != null
+          && request.auth.uid == 'ADMIN_UID_PLACEHOLDER';
+    }
+
+    /**
+     * Returns the set of keys that differ between the incoming and current doc.
+     * Shorthand for checking which fields a client is actually changing.
+     */
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // ── /teams/{teamId} ─────────────────────────────────────────────────────
+    //
+    //  READ:   Any authenticated user can read all team documents.
+    //  CREATE: Admin only (team setup is done server-side or via seed).
+    //  DELETE: Admin only.
+    //  UPDATE:
+    //    • Admin can change anything.
+    //    • Authenticated (non-admin) users may ONLY update the two fields
+    //      touched by `placeBid`: fire_coin_balance and last_bid_time.
+    //      Additionally, fire_coin_balance can only DECREASE (spend coins,
+    //      never add them directly from the client).
+    //
+    match /teams/{teamId} {
+      allow read:   if isAuthenticated();
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
+
+      allow update: if isAdmin()
+        || (
+          isAuthenticated()
+          // Only bid-related fields may change
+          && changedKeys().hasOnly(['fire_coin_balance', 'last_bid_time'])
+          // Balance can only decrease or stay the same (no free money)
+          && request.resource.data.fire_coin_balance
+              <= resource.data.fire_coin_balance
+        );
+    }
+
+    // ── /players/{playerId} ─────────────────────────────────────────────────
+    //
+    //  READ:   Any authenticated user.
+    //  CREATE: Admin only — prevents teams from adding fake players.
+    //  DELETE: Admin only.
+    //  UPDATE:
+    //    • Admin can change anything (base_price, max_limit, in_game_name…).
+    //    • Authenticated (non-admin) may ONLY update the four bid-state fields.
+    //      The player must ALREADY be 'active' (prevents manipulating upcoming
+    //      or sold players).
+    //      Status may only transition: active → active (bid update) or
+    //      active → sold (auto-sell at max_limit).
+    //
+    match /players/{playerId} {
+      allow read:   if isAuthenticated();
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
+
+      allow update: if isAdmin()
+        || (
+          isAuthenticated()
+          // Restrict to bid-related fields only
+          && changedKeys().hasOnly([
+               'current_bid',
+               'current_highest_bidder',
+               'current_highest_bidder_name',
+               'status',
+             ])
+          // Player must be active before a non-admin can touch it
+          && resource.data.status == 'active'
+          // Status can only go to 'active' (same) or 'sold' (auto-sell)
+          && (
+               request.resource.data.status == 'active'
+               || request.resource.data.status == 'sold'
+             )
+          // Bid can only increase
+          && request.resource.data.current_bid >= resource.data.current_bid
+        );
+    }
+
+    // ── /auction_state/{doc} ────────────────────────────────────────────────
+    //
+    //  READ:   Any authenticated user (needed to know the active player ID).
+    //  WRITE:  Admin only — only the auctioneer sets the active player.
+    //
+    match /auction_state/{doc} {
+      allow read:  if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ── Catch-all ────────────────────────────────────────────────────────────
+    //  Deny all access to any other collection not explicitly listed above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
