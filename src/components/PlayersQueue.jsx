@@ -14,10 +14,13 @@ const StatusBadge = ({ status }) => {
 };
 
 export function PlayersQueue({ players, activePlayerId }) {
+  // Captains are locked into rosters — permanently excluded from the bidding pool
+  const biddablePlayers = players.filter((p) => !p.is_captain);
+
   // 'unsold' players are re-listable, so group them with upcoming
-  const upcoming = players.filter((p) => p.status === 'upcoming' || p.status === 'unsold');
-  const sold     = players.filter((p) => p.status === 'sold');
-  const unsoldCount = players.filter((p) => p.status === 'unsold').length;
+  const upcoming    = biddablePlayers.filter((p) => p.status === 'upcoming' || p.status === 'unsold');
+  const sold        = biddablePlayers.filter((p) => p.status === 'sold');
+  const captainCount = players.filter((p) => p.is_captain === true).length;
 
   const PlayerRow = ({ player }) => {
     const isActive = player.id === activePlayerId;
@@ -75,13 +78,16 @@ export function PlayersQueue({ players, activePlayerId }) {
           Player Queue
         </h2>
         <p className="text-xs text-muted font-inter mt-0.5">
-          {upcoming.length} upcoming · {sold.length} sold
+          {upcoming.length} upcoming · {sold.length} drafted
+          {captainCount > 0 && (
+            <span className="text-amber-400/80"> · {captainCount} captain{captainCount !== 1 ? 's' : ''} locked</span>
+          )}
         </p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-        {/* Active first */}
-        {players.filter((p) => p.id === activePlayerId).map((p) => (
+        {/* Active first — only if non-captain */}
+        {biddablePlayers.filter((p) => p.id === activePlayerId).map((p) => (
           <PlayerRow key={p.id} player={p} />
         ))}
 

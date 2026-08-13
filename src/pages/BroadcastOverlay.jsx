@@ -62,12 +62,16 @@ function SoldOutStamp({ winnerName, winningBid }) {
   );
 }
 
+import { useAllPlayers } from '../hooks/useAllPlayers';
+import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  BroadcastOverlay Component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function BroadcastOverlay() {
   const { activePlayer, auctionPaused, isRevealed, auctionState } = useAuctionRoom(null);
   const { teams } = useAllTeams();
+  const { players } = useAllPlayers();
   const [transparentBg, setTransparentBg] = useState(false);
 
   const isSold = activePlayer?.status === 'sold';
@@ -86,7 +90,7 @@ export default function BroadcastOverlay() {
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="w-2 h-2 rounded-full bg-fire-500 animate-pulse" />
             <span className="text-[11px] font-rajdhani font-black tracking-[0.2em] text-white uppercase hidden sm:inline">
-              TEAM WALLETS
+              TEAMS & ROSTERS
             </span>
           </div>
 
@@ -95,6 +99,7 @@ export default function BroadcastOverlay() {
             {teams.map((t) => {
               const isBankrupt = (t.fire_coin_balance ?? 0) === 0;
               const isLow = !isBankrupt && (t.fire_coin_balance ?? 0) < 500;
+              const { totalCount, isFull } = getTeamFullRoster(t.id, players);
               return (
                 <div
                   key={t.id}
@@ -102,13 +107,17 @@ export default function BroadcastOverlay() {
                     ${isBankrupt ? 'border-red-500/40 opacity-40' : isLow ? 'border-amber-500/40' : ''}`}
                 >
                   <span className="font-rajdhani font-bold text-xs text-slate-300 truncate max-w-[110px]">
-                    {t.team_name}
+                    {t.name || t.team_name}
                   </span>
                   <span
                     className={`font-rajdhani font-black text-xs tabular-nums
                       ${isBankrupt ? 'text-red-400' : isLow ? 'text-amber-400' : 'text-gold-400'}`}
                   >
                     ₣{(t.fire_coin_balance ?? 0).toLocaleString()}
+                  </span>
+                  <span className={`text-[9px] font-rajdhani font-bold px-1.5 py-0.2 rounded
+                    ${isFull ? 'bg-gold-500/20 text-gold-400' : 'bg-surface-700 text-slate-400'}`}>
+                    {totalCount}/{MAX_ROSTER_SIZE}
                   </span>
                 </div>
               );

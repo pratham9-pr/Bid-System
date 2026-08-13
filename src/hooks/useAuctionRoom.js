@@ -13,12 +13,13 @@ export function useAuctionRoom(teamId) {
   const [team,           setTeam]           = useState(null);
   const [activePlayerId, setActivePlayerId] = useState(null);
   const [isRevealed,     setIsRevealed]     = useState(false);
+  const [biddingOpen,    setBiddingOpen]    = useState(false);
   const [auctionState,   setAuctionState]   = useState(null);
   const [auctionPaused,  setAuctionPaused]  = useState(false);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState(null);
 
-  // Helper to fetch full player doc
+  // Helper to fetch full player doc — returns null for captains (not biddable)
   const fetchPlayer = async (id) => {
     if (!id) {
       setActivePlayer(null);
@@ -30,9 +31,10 @@ export function useAuctionRoom(teamId) {
       .eq('id', id)
       .maybeSingle();
 
-    if (!error && data) {
+    if (!error && data && !data.is_captain) {
       setActivePlayer(data);
     } else {
+      // Captain or not found — clear active player so bidding UI stays closed
       setActivePlayer(null);
     }
   };
@@ -65,6 +67,7 @@ export function useAuctionRoom(teamId) {
           setAuctionState(stateData);
           setActivePlayerId(stateData.active_player_id || null);
           setIsRevealed(stateData.is_revealed === true);
+          setBiddingOpen(stateData.bidding_open === true);
           setAuctionPaused(stateData.status === 'paused' || stateData.auction_paused === true);
           if (stateData.active_player_id) {
             await fetchPlayer(stateData.active_player_id);
@@ -106,6 +109,7 @@ export function useAuctionRoom(teamId) {
             setAuctionState(newState);
             setActivePlayerId(newState.active_player_id || null);
             setIsRevealed(newState.is_revealed === true);
+            setBiddingOpen(newState.bidding_open === true);
             setAuctionPaused(newState.status === 'paused' || newState.auction_paused === true);
             if (newState.active_player_id) {
               fetchPlayer(newState.active_player_id);
@@ -161,6 +165,7 @@ export function useAuctionRoom(teamId) {
     team,
     activePlayerId,
     isRevealed,
+    biddingOpen,
     auctionPaused,
     loading,
     error,

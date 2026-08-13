@@ -4,6 +4,11 @@ import { supabase } from '../config/supabase';
 /**
  * useAllPlayers (Supabase Realtime)
  * Fetches all players and subscribes to any INSERT/UPDATE/DELETE.
+ *
+ * Returns:
+ *   players       — full unfiltered list (for roster/captain UI)
+ *   auctionPlayers — excludes captains (is_captain=true) — safe for bidding pools
+ *   captains       — only appointed captains
  */
 export function useAllPlayers() {
   const [players, setPlayers] = useState([]);
@@ -34,16 +39,18 @@ export function useAllPlayers() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'players' },
-        () => {
-          fetchPlayers();
-        }
+        () => { fetchPlayers(); }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  return { players, loading, error, refetch: fetchPlayers };
+  // ── Derived lists ──────────────────────────────────────────────────────────
+  // auctionPlayers: captains are permanently excluded from the bidding pool
+  const auctionPlayers = players.filter((p) => !p.is_captain);
+  // captains: only explicitly-appointed captain rows
+  const captains       = players.filter((p) => p.is_captain === true);
+
+  return { players, auctionPlayers, captains, loading, error, refetch: fetchPlayers };
 }

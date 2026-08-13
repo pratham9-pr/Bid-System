@@ -39,12 +39,17 @@ function useAnimatedNumber(target, duration = 700) {
   return displayed;
 }
 
+import { useAllPlayers } from '../hooks/useAllPlayers';
+import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
+
 // ─── Team Row ────────────────────────────────────────────────────────────────
-function TeamRow({ team, rank }) {
+function TeamRow({ team, rank, players = [] }) {
   const balance    = team.fire_coin_balance ?? 0;
   const animated   = useAnimatedNumber(balance);
   const isBankrupt = balance === 0;
   const isWarning  = balance > 0 && balance < 500;
+
+  const { totalCount, isFull, remainingSlots } = getTeamFullRoster(team.id, players);
 
   // State transitions tracked for subtle flash on balance drop
   const prevBalanceRef = useRef(balance);
@@ -80,11 +85,26 @@ function TeamRow({ team, rank }) {
 
       {/* Team info */}
       <div className="flex-1 min-w-0">
-        <p className={`font-rajdhani font-bold text-sm leading-none truncate transition-colors
-          ${isBankrupt ? 'text-red-500/50' : 'text-slate-200'}`}>
-          {team.team_name}
-        </p>
-        <p className="text-[10px] text-muted font-inter mt-0.5 truncate">{team.owner_name}</p>
+        <div className="flex items-center gap-1.5">
+          <p className={`font-rajdhani font-bold text-sm leading-none truncate transition-colors
+            ${isBankrupt ? 'text-red-500/50' : 'text-slate-200'}`}>
+            {team.name || team.team_name}
+          </p>
+          {isFull && (
+            <span className="px-1.5 py-0.2 rounded bg-gold-500/20 text-gold-400 border border-gold-500/30 text-[8px] font-rajdhani font-black uppercase">
+              Full
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-[10px] text-amber-400 font-rajdhani font-bold">
+            {totalCount}/{MAX_ROSTER_SIZE} Roster
+          </span>
+          <span className="text-white/20 text-[9px]">•</span>
+          <span className="text-[10px] text-muted font-inter truncate">
+            {remainingSlots} open
+          </span>
+        </div>
       </div>
 
       {/* Balance */}
@@ -143,8 +163,9 @@ function TeamRow({ team, rank }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export function CompetitorSidebar({ currentTeamId }) {
   const { teams, loading } = useAllTeams();
+  const { players } = useAllPlayers();
 
-  // Rank sorted by descending balance (useAllTeams already does this, but keep explicit)
+  // Rank sorted by descending balance
   const ranked = [...teams].sort((a, b) => (b.fire_coin_balance ?? 0) - (a.fire_coin_balance ?? 0));
 
   const bankruptCount = teams.filter((t) => (t.fire_coin_balance ?? 0) === 0).length;
@@ -229,7 +250,7 @@ export function CompetitorSidebar({ currentTeamId }) {
                 ? 'ring-1 ring-fire-500/25 rounded-xl'
                 : ''}
             >
-              <TeamRow team={team} rank={i + 1} />
+              <TeamRow team={team} rank={i + 1} players={players} />
               {/* "You" indicator for current team */}
               {currentTeamId === team.id && (
                 <div className="px-4 pb-1 -mt-0.5">

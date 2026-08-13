@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { placeBid, MAX_BID_LIMIT } from '../services/auctionService';
+import { useAllPlayers } from '../hooks/useAllPlayers';
+import { isTeamRosterFull, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
 
 // ─── SVG Ring Constants ──────────────────────────────────────────────────────
 const RING_SIZE       = 72;   // px — total SVG canvas size
@@ -145,16 +147,19 @@ function CooldownRingButton({ onBid, disabled, isSold, isPaused, isInsufficient 
 // ─────────────────────────────────────────────────────────────────────────────
 //  BidPanel — main export
 // ─────────────────────────────────────────────────────────────────────────────
-export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isRevealed = true }) {
+export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isRevealed = true, biddingOpen = false }) {
   const [bidAmount, setBidAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { players } = useAllPlayers();
 
   const teamBalance = team?.fire_coin_balance ?? 0;
   const currentBid  = activePlayer?.current_bid ?? 0;
   const isInsufficient = Boolean(activePlayer && teamBalance < (currentBid + 1));
   const isCapReached   = currentBid >= MAX_BID_LIMIT;
   const isSold         = activePlayer?.status === 'sold';
-  const isDisabled     = !activePlayer || !isRevealed || isSold || isCapReached || auctionPaused || isInsufficient;
+  const isRosterFull   = isTeamRosterFull(team?.id, players);
+  const isFloorLocked  = isRevealed && activePlayer && !biddingOpen; // revealed but host hasn't opened floor
+  const isDisabled     = !activePlayer || !isRevealed || isSold || isCapReached || auctionPaused || isInsufficient || isRosterFull || !biddingOpen;
 
   useEffect(() => {
     if (activePlayer) {
@@ -175,6 +180,10 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
 
   const handleBid = useCallback(async () => {
     if (!activePlayer || !team) return;
+    if (isRosterFull) {
+      onNotify?.({ type: 'error', message: 'Roster is full! You have 1 Captain + 3 Drafted Players.' });
+      return;
+    }
     const amount = Number(bidAmount);
 
     if (isNaN(amount) || amount <= 0) {
@@ -223,7 +232,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
         onNotify?.({ type: 'error', message: msg });
       }
     }
-  }, [bidAmount, activePlayer, team, teamBalance, onNotify]);
+  }, [bidAmount, activePlayer, team, teamBalance, isRosterFull, onNotify]);
 
   return (
     <div className="card-elevated p-5 flex flex-col gap-4">
@@ -232,6 +241,15 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
         <h3 className="font-rajdhani font-bold text-lg text-white tracking-wide">Place Bid</h3>
         {isSold ? (
           <span className="badge-sold text-[10px]">Auction Closed</span>
+        ) : isRosterFull ? (
+          <span className="px-2 py-0.5 rounded bg-gold-500/20 text-gold-400 border border-gold-500/40 text-[9px] font-rajdhani font-black uppercase">
+            Roster Full (4/4)
+          </span>
+        ) : biddingOpen && isRevealed ? (
+          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[9px] font-rajdhani font-black uppercase flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+            Floor Open
+          </span>
         ) : !isRevealed && activePlayer ? (
           <span className="text-[10px] font-rajdhani font-bold uppercase tracking-wider text-amber-400">
             Stage Locked
@@ -243,8 +261,56 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
         )}
       </div>
 
+      {/* ── ROSTER FULL BANNER ─────────────────────────────────────────── */}
+      {isRosterFull && (
+        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-gold-500/10 border border-gold-500/30 text-gold-400">
+          <span className="text-sm">👑</span>
+          <div className="flex-1">
+            <p className="text-xs font-rajdhani font-black uppercase tracking-widest text-gold-400">
+              Team Roster Complete (4/4)
+            </p>
+            <p className="text-[9px] text-slate-300 font-inter mt-0.5">
+              Your franchise has acquired 1 Captain + 3 Drafted Players. Bidding is complete!
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── WAITING FOR HOST — bidding floor not yet open ─────────────── */}
+      {isFloorLocked && !isRosterFull && !auctionPaused && (
+        <div className="relative flex flex-col items-center justify-center gap-3 px-4 py-6 rounded-2xl
+                        bg-gradient-to-br from-surface-800/80 via-surface-900 to-surface-800/80
+                        border-2 border-amber-500/40 overflow-hidden">
+          {/* Sweeping shimmer */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-500/5 to-transparent animate-[shimmer_2s_infinite]" />
+          {/* Lock icon pulsing */}
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center
+                          shadow-[0_0_20px_rgba(245,158,11,0.15)] animate-pulse">
+            <span className="text-2xl">🔒</span>
+          </div>
+          <div className="text-center">
+            <p className="font-rajdhani font-black text-base text-amber-300 uppercase tracking-wider leading-snug">
+              Waiting for Host to Start Bidding…
+            </p>
+            <p className="text-[10px] text-slate-400 font-inter mt-1">
+              The floor is locked. The auctioneer will open bidding shortly.
+            </p>
+          </div>
+          {/* Animated dots */}
+          <div className="flex gap-1.5">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-full bg-amber-400/70"
+                style={{ animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite` }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── UNREVEALED SUSPENSE BANNER ─────────────────────────────────── */}
-      {activePlayer && !isRevealed && (
+      {activePlayer && !isRevealed && !isRosterFull && (
         <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl
                         bg-amber-500/10 border border-amber-500/30 animate-pulse">
           <span className="text-amber-400 text-sm">🔒</span>
@@ -260,7 +326,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
       )}
 
       {/* ── AUCTION PAUSED banner ──────────────────────────────────────── */}
-      {auctionPaused && (
+      {auctionPaused && !isRosterFull && (
         <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl
                         bg-amber-500/10 border border-amber-500/25 animate-fade-in">
           <span className="text-amber-400 text-sm">⏸</span>
@@ -276,7 +342,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
       )}
 
       {/* ── INSUFFICIENT BALANCE WARNING ────────────────────────────────── */}
-      {isInsufficient && !auctionPaused && !isSold && isRevealed && (
+      {isInsufficient && !auctionPaused && !isSold && isRevealed && !isRosterFull && (
         <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl
                         bg-red-500/10 border border-red-500/25 animate-fade-in text-red-400">
           <span className="text-sm">⚠️</span>
@@ -382,9 +448,11 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
             ? 'Cannot bid: your remaining balance is lower than the active player bid.'
             : auctionPaused
               ? 'The host has paused the auction. Bidding will resume shortly.'
-              : activePlayer
-                ? `Min bid: ₣${(activePlayer.current_bid + 1).toLocaleString()} · Global Auto-sell Cap: ₣${MAX_BID_LIMIT.toLocaleString()} FC`
-                : 'Waiting for the auctioneer to start…'}
+              : isFloorLocked
+                ? 'Bidding floor is locked — the host will open bids momentarily.'
+                : activePlayer && biddingOpen
+                  ? `Min bid: ₣${(activePlayer.current_bid + 1).toLocaleString()} · Global Auto-sell Cap: ₣${MAX_BID_LIMIT.toLocaleString()} FC`
+                  : 'Waiting for the auctioneer to start…'}
       </p>
 
       {/* Cooldown visual indicator strip */}

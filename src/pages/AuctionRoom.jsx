@@ -14,8 +14,8 @@ export default function AuctionRoom() {
   const { team, signOut } = useAuth();
   const navigate          = useNavigate();
 
-  const { activePlayer, team: liveTeam, auctionPaused, isRevealed, loading, error } = useAuctionRoom(team?.id);
-  const { players }                                       = useAllPlayers();
+  const { activePlayer, team: liveTeam, auctionPaused, isRevealed, biddingOpen, loading, error } = useAuctionRoom(team?.id);
+  const { players, auctionPlayers }  = useAllPlayers();
   const [notification, setNotification]                   = useState(null);
 
   const handleNotify  = useCallback((n) => setNotification(n), []);
@@ -48,8 +48,15 @@ export default function AuctionRoom() {
           <span className="font-rajdhani font-black text-white tracking-wider hidden sm:block uppercase">
             Demons Reign Auction
           </span>
-          {activePlayer && isRevealed && !auctionPaused && (
-            <span className="badge-active hidden md:inline-flex animate-pulse">Live</span>
+          {activePlayer && isRevealed && !biddingOpen && !auctionPaused && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px]
+                             font-rajdhani font-bold uppercase tracking-widest
+                             bg-amber-500/15 text-amber-300 border border-amber-500/25 hidden md:inline-flex animate-pulse">
+              🔒 Waiting for Host…
+            </span>
+          )}
+          {activePlayer && isRevealed && biddingOpen && !auctionPaused && (
+            <span className="badge-active hidden md:inline-flex animate-pulse">Live · Floor Open</span>
           )}
           {activePlayer && !isRevealed && (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px]
@@ -105,7 +112,7 @@ export default function AuctionRoom() {
                           lg:overflow-y-auto">
           <div className="p-4 h-full lg:min-h-0">
             <PlayersQueue
-              players={players}
+              players={auctionPlayers}
               activePlayerId={activePlayer?.id}
             />
           </div>
@@ -146,6 +153,7 @@ export default function AuctionRoom() {
               onNotify={handleNotify}
               auctionPaused={auctionPaused}
               isRevealed={isRevealed}
+              biddingOpen={biddingOpen}
             />
             {/* ── Competitor Wallet HUD ──────────────────────────────────── */}
             <CompetitorSidebar currentTeamId={displayTeam?.id} />
