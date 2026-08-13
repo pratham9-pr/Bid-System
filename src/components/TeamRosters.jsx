@@ -60,43 +60,37 @@ function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamNa
             <span>CAPTAIN</span>
           </div>
           
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu((prev) => !prev)}
-              className="text-[8px] font-rajdhani font-black text-amber-300 bg-black/50 hover:bg-amber-500 hover:text-black px-1.5 py-0.5 rounded uppercase tracking-widest border border-amber-500/40 transition-colors cursor-pointer"
+          <div className="relative inline-flex items-center">
+            <select
+              value=""
+              onChange={async (e) => {
+                const selectedPlayerId = e.target.value;
+                if (!selectedPlayerId) return;
+                setLoading(true);
+                await appointTeamCaptain(selectedPlayerId, teamId, teamName);
+                setLoading(false);
+                onAppoint?.();
+              }}
+              disabled={loading}
+              className="appearance-none pl-2 pr-4 py-0.5 rounded text-[8px] font-rajdhani font-black uppercase tracking-widest
+                         bg-black/60 text-amber-300 border border-amber-500/40 hover:border-amber-400
+                         hover:bg-amber-500/20 transition-all cursor-pointer focus:outline-none"
               title="Change or reassign this team's Captain"
             >
-              ⚙ Change
-            </button>
-
-            {/* Dropdown to change captain from pool */}
-            {showMenu && (
-              <div className="absolute right-0 top-full mt-1.5 w-48 max-h-56 overflow-y-auto rounded-xl bg-surface-900 border border-amber-500/40 shadow-2xl p-1 z-50 animate-fade-in backdrop-blur-md">
-                <div className="px-2 py-1 text-[9px] font-rajdhani font-black text-amber-400 uppercase tracking-wider border-b border-surface-700/60 mb-1">
-                  Appoint Player (IGL):
-                </div>
-                {eligibleForCaptain.length === 0 ? (
-                  <div className="p-2 text-[10px] text-muted font-inter text-center">No other players</div>
-                ) : (
-                  eligibleForCaptain.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={async () => {
-                        setShowMenu(false);
-                        setLoading(true);
-                        await appointTeamCaptain(p.id, teamId, teamName);
-                        setLoading(false);
-                        onAppoint?.();
-                      }}
-                      className="w-full text-left px-2 py-1.5 rounded-lg text-xs font-rajdhani font-bold text-white hover:bg-amber-500/20 hover:text-amber-300 transition-colors flex items-center justify-between"
-                    >
-                      <span className="truncate">{p.in_game_name || p.name}</span>
-                      <span className="text-[9px] text-amber-400 font-inter">IGL</span>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
+              <option value="" disabled className="bg-surface-900 text-muted">
+                ⚙ Change
+              </option>
+              {eligibleForCaptain.map((p) => (
+                <option key={p.id} value={p.id} className="bg-surface-900 text-white font-rajdhani font-bold">
+                  {p.in_game_name || p.name} (IGL)
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-amber-400">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-2 h-2">
+                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
           </div>
         </div>
       ) : (

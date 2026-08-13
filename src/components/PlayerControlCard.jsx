@@ -66,12 +66,9 @@ const TEAMS_LIST = [
 //   • Global host controls: Pause/Resume Auction, Next Player
 // ─────────────────────────────────────────────────────────────────────────────
 export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused, teams = [] }) {
-  const [loading, setLoading]           = useState('');
-  const [msg, setMsg]                   = useState('');
-  const [msgOk, setMsgOk]               = useState(false);
-  const [showCaptainMenu, setShowCaptainMenu] = useState(false);
-  const [showSellMenu, setShowSellMenu] = useState(false);
-  const [sellTarget, setSellTarget]     = useState('');
+  const [loading, setLoading] = useState('');
+  const [msg, setMsg]         = useState('');
+  const [msgOk, setMsgOk]     = useState(false);
 
   const isCaptain = Boolean(player.is_captain || player.status === 'captain');
 
@@ -197,79 +194,43 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
               {isLoading('removeCaptain') ? '…' : '👑 Remove Captain'}
             </button>
           ) : (
-            <div className="relative">
-              <button
-                id={`admin-appoint-btn-${player.id}`}
-                onClick={() => setShowCaptainMenu((prev) => !prev)}
+            <div className="relative inline-flex items-center">
+              <select
+                id={`admin-appoint-select-${player.id}`}
+                value=""
+                onChange={(e) => {
+                  const teamId = e.target.value;
+                  if (!teamId) return;
+                  const teamList = teams.length > 0 ? teams : TEAMS_LIST.map((t) => ({ id: t.id, team_name: t.name }));
+                  const team = teamList.find((t) => t.id === teamId);
+                  const teamName = team?.team_name || team?.name || teamId;
+                  run('appoint', () => appointTeamCaptain(player.id, teamId, teamName));
+                }}
                 disabled={!!loading}
-                className="px-2.5 py-1.5 rounded-lg text-[10px] font-inter font-bold uppercase tracking-wider
-                           bg-amber-500/15 text-amber-300 border border-amber-500/30
-                           hover:bg-amber-500/25 hover:border-amber-400 transition-all flex items-center gap-1 cursor-pointer"
-                title="Appoint this player as a franchise Captain (automatically marks as IGL & locks into roster)"
+                className="appearance-none pl-7 pr-6 py-1.5 rounded-lg text-[10px] font-rajdhani font-bold uppercase tracking-wider
+                           bg-amber-500/15 text-amber-300 border border-amber-500/40 hover:border-amber-400
+                           hover:bg-amber-500/25 transition-all cursor-pointer focus:outline-none focus:border-amber-400"
+                title="Appoint this player as a franchise Captain"
               >
-                <span>👑</span>
-                <span>{isLoading('appoint') ? '…' : 'Appoint Captain'}</span>
-              </button>
-
-              {/* Captain Appointment Dropdown — scrollable, uses live teams prop */}
-              {showCaptainMenu && (
-                <div className="absolute right-0 top-full mt-2 w-64 rounded-2xl bg-surface-900
-                               border border-amber-500/50 shadow-[0_8px_40px_rgba(0,0,0,0.6)] z-[9999]
-                               animate-fade-in backdrop-blur-md overflow-hidden">
-
-                  {/* Header */}
-                  <div className="px-3 py-2.5 border-b border-surface-700/60 bg-amber-500/8 flex items-center gap-2">
-                    <span className="text-amber-400">👑</span>
-                    <div>
-                      <p className="font-rajdhani font-black text-xs text-amber-300 uppercase tracking-widest leading-none">
-                        Appoint as IGL Captain
-                      </p>
-                      <p className="text-[9px] text-muted font-inter mt-0.5">
-                        Locks into roster · excluded from bidding
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Scrollable team list */}
-                  <div className="max-h-64 overflow-y-auto overscroll-contain p-1.5 space-y-0.5">
-                    {(teams.length > 0 ? teams : TEAMS_LIST.map(t => ({ id: t.id, team_name: t.name }))).map((t) => {
-                      const teamName = t.team_name || t.name || t.id;
-                      const initials = teamName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-                      return (
-                        <button
-                          key={t.id}
-                          onClick={() => {
-                            setShowCaptainMenu(false);
-                            run('appoint', () => appointTeamCaptain(player.id, t.id, teamName));
-                          }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-sm font-rajdhani font-bold
-                                     text-white hover:bg-amber-500/20 hover:text-amber-200
-                                     transition-all flex items-center gap-2.5 group cursor-pointer"
-                        >
-                          {/* Team avatar chip */}
-                          <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30
-                                          flex items-center justify-center text-[10px] font-rajdhani font-black text-amber-400
-                                          group-hover:bg-amber-500/30 transition-colors flex-shrink-0">
-                            {initials}
-                          </div>
-                          <span className="flex-1 truncate">{teamName}</span>
-                          <span className="text-[9px] text-amber-500/70 font-inter flex-shrink-0">IGL</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Cancel footer */}
-                  <div className="border-t border-surface-700/40 px-2 py-1.5">
-                    <button
-                      onClick={() => setShowCaptainMenu(false)}
-                      className="w-full py-1 text-[9px] text-muted font-inter hover:text-white transition-colors rounded-lg hover:bg-surface-700/50"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
+                <option value="" disabled className="bg-surface-900 text-muted">
+                  Appoint Captain ▾
+                </option>
+                {(teams.length > 0 ? teams : TEAMS_LIST.map((t) => ({ id: t.id, team_name: t.name }))).map((t) => (
+                  <option key={t.id} value={t.id} className="bg-surface-900 text-white font-rajdhani font-bold">
+                    {t.team_name || t.name}
+                  </option>
+                ))}
+              </select>
+              {/* Crown icon */}
+              <span className="pointer-events-none absolute left-2 text-[10px] text-amber-400">
+                👑
+              </span>
+              {/* Chevron */}
+              <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-amber-400">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
+                  <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
             </div>
           )}
 
@@ -339,64 +300,45 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
 
           {/* 5. Quick Sell → Team (Manual Override) */}
           {!isCaptain && player.status !== 'sold' && teams.length > 0 && (
-            <div className="relative">
-              <button
-                id={`admin-quicksell-toggle-${player.id}`}
-                onClick={() => { setShowSellMenu((prev) => !prev); setSellTarget(''); }}
+            <div className="relative inline-flex items-center">
+              <select
+                id={`admin-quicksell-select-${player.id}`}
+                value=""
+                onChange={(e) => {
+                  const targetTeamId = e.target.value;
+                  if (!targetTeamId) return;
+                  const team = teams.find((t) => t.id === targetTeamId);
+                  if (!team) return;
+                  run('quickSell', () =>
+                    manualSellToTeam(
+                      player.id,
+                      targetTeamId,
+                      team.team_name || team.name,
+                      player.current_bid || player.base_price || 0,
+                    )
+                  );
+                }}
                 disabled={!!loading}
-                className={`px-2.5 py-1.5 rounded-lg text-[10px] font-inter font-bold uppercase tracking-wider transition-all
-                  ${showSellMenu
-                    ? 'bg-gold-500/30 text-gold-300 border border-gold-400/60'
-                    : 'bg-gold-500/15 text-gold-400 border border-gold-500/30 hover:bg-gold-500/25'}`}
+                className="appearance-none pl-6 pr-6 py-1.5 rounded-lg text-[10px] font-rajdhani font-bold uppercase tracking-wider
+                           bg-gold-500/15 text-gold-400 border border-gold-500/30 hover:border-gold-400
+                           hover:bg-gold-500/25 transition-all cursor-pointer focus:outline-none"
                 title="Manually sell this player to a specific team"
               >
-                {isLoading('quickSell') ? '…' : '🏷️ Sell ▾'}
-              </button>
-
-              {/* Inline sell dropdown */}
-              {showSellMenu && (
-                <div className="absolute right-0 top-full mt-1.5 w-52 rounded-xl bg-surface-900 border border-gold-500/40 shadow-2xl p-2 z-50 animate-fade-in backdrop-blur-md">
-                  <div className="text-[9px] font-rajdhani font-black text-gold-400 uppercase tracking-wider mb-1.5 px-1">
-                    Assign to Franchise:
-                  </div>
-                  <select
-                    value={sellTarget}
-                    onChange={(e) => setSellTarget(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg font-rajdhani font-bold text-xs text-white
-                               bg-surface-800 border border-gold-500/30 focus:border-gold-400 focus:outline-none cursor-pointer mb-2"
-                  >
-                    <option value="" disabled className="bg-surface-900">— Select Team —</option>
-                    {teams.map((t) => (
-                      <option key={t.id} value={t.id} className="bg-surface-900">
-                        {t.team_name || t.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => {
-                      if (!sellTarget) return;
-                      const team = teams.find((t) => t.id === sellTarget);
-                      if (!team) return;
-                      setShowSellMenu(false);
-                      run('quickSell', () =>
-                        manualSellToTeam(
-                          player.id,
-                          sellTarget,
-                          team.team_name || team.name,
-                          player.current_bid || player.base_price || 0,
-                        )
-                      );
-                    }}
-                    disabled={!sellTarget}
-                    className="w-full py-1.5 rounded-lg font-rajdhani font-black text-xs tracking-wider uppercase
-                               bg-gradient-to-r from-gold-500 to-amber-500 text-black
-                               hover:brightness-110 active:scale-95 transition-all
-                               disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    ✓ Confirm Sell
-                  </button>
-                </div>
-              )}
+                <option value="" disabled className="bg-surface-900 text-muted">
+                  Sell ▾
+                </option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id} className="bg-surface-900 text-white font-rajdhani font-bold">
+                    {t.team_name || t.name}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute left-1.5 text-[10px]">🏷️</span>
+              <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-gold-400">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
+                  <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
             </div>
           )}
 
