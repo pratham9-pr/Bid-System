@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../config/supabase';
 
 /**
@@ -19,6 +19,12 @@ export function useAuctionRoom(teamId) {
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState(null);
 
+  const activePlayerIdRef = useRef(activePlayerId);
+  activePlayerIdRef.current = activePlayerId;
+
+  const teamIdRef = useRef(teamId);
+  teamIdRef.current = teamId;
+
   // Helper to fetch full player doc — returns null for captains (not biddable)
   const fetchPlayer = async (id) => {
     if (!id) {
@@ -35,7 +41,6 @@ export function useAuctionRoom(teamId) {
     if (!error && data && !data.is_captain) {
       setActivePlayer(data);
     } else {
-      // Captain or not found — clear active player so bidding UI stays closed
       setActivePlayer(null);
     }
   };
@@ -49,7 +54,14 @@ export function useAuctionRoom(teamId) {
       .eq('id', String(id))
       .maybeSingle();
 
-    if (data) setTeam(data);
+    if (data) {
+      let bal = typeof data.fire_coin_balance === 'number' ? data.fire_coin_balance : 40000;
+      if (bal > 40000) {
+        const spent = Math.max(0, 50000 - bal);
+        bal = Math.max(0, 40000 - spent);
+      }
+      setTeam({ ...data, fire_coin_balance: bal });
+    }
   };
 
   // 1. Initial Data Fetch & State Listener
@@ -128,7 +140,6 @@ export function useAuctionRoom(teamId) {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'auction_state' },
         (payload) => {
-          console.log('Real-time auction_state update received:', payload.new);
           const newState = payload.new;
           if (newState && isMounted) {
             setAuctionState(newState);
@@ -161,7 +172,11 @@ export function useAuctionRoom(teamId) {
         (payload) => {
           const newPlayer = payload.new;
           if (newPlayer && isMounted) {
-            if (newPlayer.status === 'active' || newPlayer.id === activePlayerId) {
+            const currentTargetId = activePlayerIdRef.current;
+            if (
+              newPlayer.status === 'active' ||
+              (currentTargetId && String(newPlayer.id) === String(currentTargetId))
+            ) {
               if (!newPlayer.is_captain) {
                 setActivePlayer(newPlayer);
               } else {
@@ -177,19 +192,23 @@ export function useAuctionRoom(teamId) {
         { event: '*', schema: 'public', table: 'teams' },
         (payload) => {
           const updatedTeam = payload.new;
-          if (updatedTeam && isMounted && String(updatedTeam.id) === String(teamId)) {
-            setTeam(updatedTeam);
+          const currentTeamId = teamIdRef.current;
+          if (updatedTeam && isMounted && currentTeamId && String(updatedTeam.id) === String(currentTeamId)) {
+            let bal = typeof updatedTeam.fire_coin_balance === 'number' ? updatedTeam.fire_coin_balance : 40000;
+            if (bal > 40000) {
+              const spent = Math.max(0, 50000 - bal);
+              bal = Math.max(0, 40000 - spent);
+            }
+            setTeam({ ...updatedTeam, fire_coin_balance: bal });
           }
         }
       )
-      .subscribe((status) => {
-        console.log('Auction channel status:', status);
-      });
+      .subscribe();
 
-    // 3. Fallback polling every 1.5s to ensure 100% sync even if tab sleeps
+    // 3. Fallback polling every 2s to ensure 100% sync even if tab sleeps
     const pollInterval = setInterval(() => {
       if (isMounted) syncState();
-    }, 1500);
+    }, 2000);
 
     return () => {
       isMounted = false;

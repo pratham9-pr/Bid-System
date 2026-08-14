@@ -100,44 +100,43 @@ export function MyBalanceWidget({ team }) {
 
         {/* ── 4-Player Roster Status Mini Bar ──────────────────────────────── */}
         <div className="mt-4 pt-3 border-t border-surface-600/50 space-y-2">
-          {/* Captain preview */}
+          {/* Captain / Squad preview */}
           <div className="flex items-center justify-between text-xs font-rajdhani">
-            <div className="flex items-center gap-1.5 text-amber-400 font-black">
-              <span>👑</span>
-              <span>Captain:</span>
-              <span className="text-white font-bold">{captain ? (captain.name || captain.in_game_name) : 'Unassigned'}</span>
-            </div>
+            {captain ? (
+              <div className="flex items-center gap-1.5 text-amber-400 font-black">
+                <span>👑</span>
+                <span>Captain:</span>
+                <span className="text-white font-bold">{captain.name || captain.in_game_name}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-purple-400 font-bold">
+                <span>🛡️</span>
+                <span>Squad Slots:</span>
+                <span className="text-white font-bold">{totalCount}/4 Drafted</span>
+              </div>
+            )}
             <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase
-              ${captain ? 'bg-amber-500/20 text-amber-300' : 'bg-surface-700 text-muted'}`}>
-              {captain ? 'Locked' : 'Open'}
+              ${captain ? 'bg-amber-500/20 text-amber-300' : isFull ? 'bg-gold-500/20 text-gold-400' : 'bg-surface-700 text-muted'}`}>
+              {captain ? 'Locked' : isFull ? 'Complete' : 'Drafting'}
             </span>
           </div>
 
-          {/* Draft Slots Indicator */}
+          {/* 4 Slot Mini Indicators */}
           <div className="flex items-center gap-1.5 pt-1">
-            {/* Slot 1: Captain */}
-            <div className={`flex-1 py-1 px-1.5 rounded text-center
-              ${captain ? 'bg-amber-500/20 border border-amber-500/40' : 'bg-surface-800 border border-dashed border-surface-600'}`}
-              title={captain ? `Captain: ${captain.name}` : 'Captain Slot Unassigned'}>
-              <span className={`text-[9px] font-rajdhani font-black uppercase
-                ${captain ? 'text-amber-300' : 'text-muted'}`}>
-                👑 {captain ? (captain.name?.split(' ')[0] || 'Captain') : 'Open'}
-              </span>
-            </div>
-
-            {/* Slots 2, 3, 4: Auction Drafted */}
-            {[0, 1, 2].map((idx) => {
-              const drafted = auctionedPlayers[idx];
+            {slots.map((p, idx) => {
+              const isCap = idx === 0 && Boolean(captain);
               return (
                 <div
                   key={idx}
                   className={`flex-1 py-1 px-1.5 rounded text-center truncate text-[9px] font-rajdhani font-bold
-                    ${drafted
+                    ${isCap
+                      ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300'
+                      : p
                       ? 'bg-gold-500/20 border border-gold-500/40 text-gold-300'
                       : 'bg-surface-800/80 border border-dashed border-surface-600 text-muted'}`}
-                  title={drafted ? drafted.in_game_name || drafted.name : `Slot ${idx + 2} Open`}
+                  title={isCap ? `Captain: ${p.name}` : p ? p.in_game_name || p.name : `Slot #${idx + 1} Open`}
                 >
-                  {drafted ? drafted.in_game_name || drafted.name : `Slot ${idx + 2}`}
+                  {isCap ? `👑 ${p.name?.split(' ')[0] || 'Cap'}` : p ? p.in_game_name || p.name : `#${idx + 1}`}
                 </div>
               );
             })}
@@ -145,7 +144,7 @@ export function MyBalanceWidget({ team }) {
 
           <div className="flex items-center justify-between text-[10px] text-muted font-inter pt-1">
             <span>{getTeamDisplayName(team.id, team.name || team.team_name)}</span>
-            <span className="text-amber-400/90 font-semibold">{remainingSlots} Draft Slot{remainingSlots !== 1 ? 's' : ''} Open</span>
+            <span className="text-amber-400/90 font-semibold">{remainingSlots} Open Slot{remainingSlots !== 1 ? 's' : ''}</span>
           </div>
         </div>
       </div>

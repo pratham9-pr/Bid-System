@@ -267,10 +267,7 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
                   Sell ▾
                 </option>
                 {(teams.length > 0 ? teams : TEAMS_CONFIG)
-                  .filter((t) => {
-                    const clean = String(t.id).toLowerCase();
-                    return clean !== 'gamma_reapers' && clean !== 'delta_phantoms' && clean !== 'team_gamma' && clean !== 'team_delta';
-                  })
+                  .filter((t) => t.isPending !== true)
                   .map((t) => (
                     <option key={t.id} value={t.id} className="bg-surface-900 text-white font-rajdhani font-bold">
                       {getTeamDisplayName(t.id, t.team_name || t.name)}

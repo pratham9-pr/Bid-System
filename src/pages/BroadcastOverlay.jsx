@@ -4,7 +4,7 @@ import { useAuctionRoom } from '../hooks/useAuctionRoom';
 import { useAllTeams } from '../hooks/useAllTeams';
 import { useAllPlayers } from '../hooks/useAllPlayers';
 import { PlayerRevealCard } from '../components/PlayerRevealCard';
-import { getTeamDisplayName, getTeamOwner } from '../config/teamsConfig';
+import { getTeamDisplayName, getTeamOwner, TEAMS_CONFIG } from '../config/teamsConfig';
 import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
 
 // ─── SOLD OUT Stamp Component ────────────────────────────────────────────────
@@ -65,34 +65,32 @@ function SoldOutStamp({ winnerName, winningBid }) {
   );
 }
 
-// ─── Dual Franchise Roster Bar (Bottom HUD) ──────────────────────────────────
-function BroadcastDualRosters({ teams, players }) {
-  const activeTeams = (teams || []).filter((t) => {
-    const clean = String(t.id).toLowerCase();
-    return (
-      clean.includes('alpha') ||
-      clean.includes('beta') ||
-      clean.includes('power') ||
-      clean.includes('vortex')
-    );
-  });
+// ─── Active Franchise Roster Bar (Bottom HUD) ───────────────────────────────
+function BroadcastActiveRosters({ teams, players }) {
+  const allFranchises = (teams && teams.length > 0 ? teams : TEAMS_CONFIG);
 
   return (
-    <div className="w-full max-w-6xl mx-auto my-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-      {activeTeams.map((team) => {
-        const { slots, totalCount, remainingSlots } = getTeamFullRoster(team.id, players);
-        const isPower =
-          String(team.id).toLowerCase().includes('alpha') ||
-          String(team.name || team.team_name || '').toLowerCase().includes('power');
+    <div className="w-full max-w-7xl mx-auto my-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {allFranchises.map((team) => {
+        const { slots, totalCount, remainingSlots, isPendingTeam } = getTeamFullRoster(team.id, players);
+        const cleanName = String(team.name || team.team_name || team.id || '').toLowerCase();
+        const isPower = cleanName.includes('alpha') || cleanName.includes('power');
+        const isVortex = cleanName.includes('beta') || cleanName.includes('vortex');
+        const isAbyssal = cleanName.includes('gamma') || cleanName.includes('abyssal') || cleanName.includes('ebon');
+        const isRxKudla = cleanName.includes('delta') || cleanName.includes('kudla') || cleanName.includes('rx');
 
         return (
           <div
             key={team.id}
-            className={`p-3 rounded-2xl border backdrop-blur-md transition-all relative overflow-hidden
+            className={`p-3 rounded-2xl border backdrop-blur-md transition-all relative overflow-hidden flex flex-col justify-between min-h-[140px]
               ${
                 isPower
                   ? 'bg-gradient-to-r from-amber-950/40 via-surface-900/90 to-surface-900/80 border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
-                  : 'bg-gradient-to-r from-sky-950/40 via-surface-900/90 to-surface-900/80 border-sky-500/30 shadow-[0_0_20px_rgba(14,165,233,0.15)]'
+                  : isVortex
+                  ? 'bg-gradient-to-r from-sky-950/40 via-surface-900/90 to-surface-900/80 border-sky-500/30 shadow-[0_0_20px_rgba(14,165,233,0.15)]'
+                  : isAbyssal
+                  ? 'bg-gradient-to-r from-emerald-950/40 via-surface-900/90 to-surface-900/80 border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+                  : 'bg-gradient-to-r from-purple-950/40 via-surface-900/90 to-surface-900/80 border-purple-500/30 shadow-[0_0_20px_rgba(168,85,247,0.15)]'
               }`}
           >
             {/* Header row */}
@@ -100,42 +98,48 @@ function BroadcastDualRosters({ teams, players }) {
               <div className="flex items-center gap-2">
                 <span
                   className={`w-2.5 h-2.5 rounded-full ${
-                    isPower ? 'bg-amber-400 animate-pulse' : 'bg-sky-400 animate-pulse'
+                    isPower
+                      ? 'bg-amber-400 animate-pulse'
+                      : isVortex
+                      ? 'bg-sky-400 animate-pulse'
+                      : isAbyssal
+                      ? 'bg-emerald-400 animate-pulse'
+                      : 'bg-purple-400 animate-pulse'
                   }`}
                 />
                 <div>
-                  <h4 className="font-rajdhani font-black text-sm sm:text-base text-white leading-tight uppercase">
+                  <h4 className="font-rajdhani font-black text-sm text-white leading-tight uppercase truncate max-w-[110px]">
                     {getTeamDisplayName(team.id, team.name || team.team_name)}
                   </h4>
-                  <p className="text-[10px] text-slate-400 font-inter">
+                  <p className="text-[10px] text-slate-400 font-inter truncate max-w-[110px]">
                     Owner: <span className="text-amber-300 font-bold">{getTeamOwner(team.id, team.owner_name || team.owner)}</span>
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <span className="font-rajdhani font-black text-sm sm:text-base text-gold-400 tabular-nums">
+                <span className="font-rajdhani font-black text-sm text-gold-400 tabular-nums">
                   ₣{(team.fire_coin_balance ?? 0).toLocaleString()}
                 </span>
                 <span className="text-[9px] text-muted font-inter block leading-none">
-                  {totalCount}/4 Roster ({remainingSlots} open draft slot{remainingSlots !== 1 ? 's' : ''})
+                  {totalCount}/4 ({remainingSlots} open)
                 </span>
               </div>
             </div>
 
             {/* 4 Slot Grid */}
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-4 gap-1">
               {slots.map((p, idx) => {
-                const isCap = idx === 0;
+                const isCap = idx === 0 && p && p.is_captain;
                 if (!p) {
                   return (
                     <div
                       key={`bcast-empty-${team.id}-${idx}`}
-                      className="p-1.5 rounded-xl border border-dashed border-white/10 bg-black/20 text-center flex flex-col items-center justify-center min-h-[52px]"
+                      className="p-1 rounded-lg border border-dashed border-white/10 bg-black/20 text-center flex flex-col items-center justify-center min-h-[48px]"
                     >
-                      <span className="text-[9px] font-rajdhani font-bold text-slate-500 uppercase">
-                        Slot #{idx + 1}
+                      <span className="text-[8px] font-rajdhani font-bold text-slate-500 uppercase">
+                        #{idx + 1}
                       </span>
-                      <span className="text-[8px] text-slate-600 font-inter">Open</span>
+                      <span className="text-[7px] text-slate-600 font-inter">Open</span>
                     </div>
                   );
                 }
@@ -143,22 +147,26 @@ function BroadcastDualRosters({ teams, players }) {
                 return (
                   <div
                     key={`bcast-slot-${team.id}-${p.id || idx}`}
-                    className={`p-1.5 rounded-xl border flex flex-col items-center justify-between text-center min-h-[52px] relative overflow-hidden
+                    className={`p-1 rounded-lg border flex flex-col items-center justify-between text-center min-h-[48px] relative overflow-hidden
                       ${
                         isCap
-                          ? 'bg-amber-500/15 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)] ring-1 ring-amber-500/20'
+                          ? isPower
+                            ? 'bg-amber-500/15 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)] ring-1 ring-amber-500/20'
+                            : isVortex
+                            ? 'bg-sky-500/15 border-sky-500/40 shadow-[0_0_10px_rgba(14,165,233,0.2)] ring-1 ring-sky-500/20'
+                            : 'bg-emerald-500/15 border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)] ring-1 ring-emerald-500/20'
                           : 'bg-surface-800/80 border-surface-600/40'
                       }`}
                   >
-                    <span className="text-[10px] font-rajdhani font-black text-white truncate max-w-full leading-tight">
+                    <span className="text-[9px] font-rajdhani font-black text-white truncate max-w-full leading-tight">
                       {p.in_game_name || p.name}
                     </span>
                     {isCap ? (
-                      <span className="px-1.5 py-0.2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-black font-rajdhani font-black text-[8px] uppercase tracking-wider mt-0.5">
-                        👑 IGL · CAPTAIN
+                      <span className="px-1 py-0.2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-black font-rajdhani font-black text-[7px] uppercase tracking-wider mt-0.5">
+                        👑 IGL
                       </span>
                     ) : (
-                      <span className="text-[8px] text-gold-400 font-inter font-bold tabular-nums mt-0.5">
+                      <span className="text-[7px] text-gold-400 font-inter font-bold tabular-nums mt-0.5">
                         ₣{(p.current_bid ?? p.sold_price ?? 0).toLocaleString()}
                       </span>
                     )}
@@ -204,27 +212,10 @@ export default function BroadcastOverlay() {
 
           {/* Team Wallets Grid Strip */}
           <div className="flex-1 flex items-center justify-end gap-3 sm:gap-6 overflow-x-auto no-scrollbar py-0.5">
-            {teams.map((t) => {
-              const isBankrupt = (t.fire_coin_balance ?? 0) === 0;
-              const isLow = !isBankrupt && (t.fire_coin_balance ?? 0) < 500;
-              const { totalCount, isFull, isPendingTeam } = getTeamFullRoster(t.id, players);
-
-              if (isPendingTeam) {
-                return (
-                  <div
-                    key={t.id}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-900/60 border border-slate-700/30 opacity-40 flex-shrink-0"
-                    title="Franchise Closed / Inactive for this draft"
-                  >
-                    <span className="font-rajdhani font-bold text-xs text-slate-500 truncate max-w-[90px]">
-                      {getTeamDisplayName(t.id, t.name || t.team_name)}
-                    </span>
-                    <span className="text-[8px] font-rajdhani font-black text-slate-500 bg-slate-800 px-1 py-0.2 rounded uppercase">
-                      🔒 CLOSED
-                    </span>
-                  </div>
-                );
-              }
+            {(teams && teams.length > 0 ? teams : TEAMS_CONFIG).map((t) => {
+              const isBankrupt = (t.fire_coin_balance ?? 0) === 0 && t.fire_coin_balance !== undefined;
+              const isLow = !isBankrupt && (t.fire_coin_balance ?? 0) < 500 && t.fire_coin_balance !== undefined;
+              const { totalCount, isFull } = getTeamFullRoster(t.id, players);
 
               return (
                 <div
@@ -338,7 +329,7 @@ export default function BroadcastOverlay() {
             >
               <div className="flex items-center justify-between mb-1 text-[10px] font-rajdhani font-black uppercase tracking-[0.2em] text-slate-400">
                 <span>{isSold ? 'WINNING FINAL BID' : 'CURRENT HIGHEST BID'}</span>
-                <span className="text-amber-400 font-black">AUTO-SELL CAP: ₣30,000 FC</span>
+                <span className="text-amber-400 font-black">AUTO-SELL CAP: ₣40,000 FC</span>
               </div>
 
               {/* Massive Number */}
@@ -368,8 +359,8 @@ export default function BroadcastOverlay() {
         </div>
       </main>
 
-      {/* ── DUAL FRANCHISE ROSTER SCOREBOARD ──────────────────────────────── */}
-      <BroadcastDualRosters teams={teams} players={players} />
+      {/* ── ACTIVE FRANCHISE ROSTER SCOREBOARD ───────────────────────────── */}
+      <BroadcastActiveRosters teams={teams} players={players} />
 
       {/* Bottom spacer */}
       <footer className="w-full text-center text-[10px] font-inter text-slate-500 tracking-wider">

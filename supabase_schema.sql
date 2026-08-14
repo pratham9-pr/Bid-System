@@ -117,10 +117,14 @@ DECLARE
     v_now TIMESTAMPTZ := clock_timestamp();
     v_cooldown_elapsed DOUBLE PRECISION;
 BEGIN
-    -- Check global auction pause state
-    SELECT * INTO v_state FROM public.auction_state WHERE id = 'current' FOR UPDATE;
+    -- Check global auction state (resilient row ID resolution)
+    SELECT * INTO v_state FROM public.auction_state LIMIT 1 FOR UPDATE;
     IF v_state.auction_paused THEN
         RETURN jsonb_build_object('success', false, 'error', 'AUCTION_PAUSED');
+    END IF;
+
+    IF v_state.bidding_open IS NOT NULL AND NOT v_state.bidding_open THEN
+        RETURN jsonb_build_object('success', false, 'error', 'FLOOR_LOCKED');
     END IF;
 
     -- Lock player row
@@ -134,7 +138,7 @@ BEGIN
     END IF;
 
     -- Lock team row
-    SELECT * INTO v_team FROM public.teams WHERE id = p_team_id FOR UPDATE;
+    SELECT * INTO v_team FROM public.teams WHERE id::text = p_team_id OR id::text ILIKE p_team_id LIMIT 1 FOR UPDATE;
     IF NOT FOUND THEN
         RETURN jsonb_build_object('success', false, 'error', 'Team not found');
     END IF;
@@ -164,16 +168,18 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'Insufficient Fire Coins. Balance: ₣' || v_team.fire_coin_balance);
     END IF;
 
-    -- 4. Auto-sell if bid >= max_limit OR bid >= 30000 (Global Max Cap)
-    IF p_bid_amount >= v_player.max_limit OR p_bid_amount >= 30000 THEN
-        IF p_bid_amount > 30000 THEN
-            p_bid_amount := 30000;
+    -- 4. Auto-sell if bid >= max_limit OR bid >= 40000 (Global Max Cap)
+    IF p_bid_amount >= v_player.max_limit OR p_bid_amount >= 40000 THEN
+        IF p_bid_amount > 40000 THEN
+            p_bid_amount := 40000;
         END IF;
 
         -- Mark as sold and deduct balance immediately
         UPDATE public.players
         SET status = 'sold',
             current_bid = p_bid_amount,
+            sold_price = p_bid_amount,
+            sold_to_team_id = v_team.id,
             current_highest_bidder = v_team.id,
             current_highest_bidder_name = v_team.team_name
         WHERE id::text = p_player_id;
@@ -181,7 +187,15 @@ BEGIN
         UPDATE public.teams
         SET fire_coin_balance = fire_coin_balance - p_bid_amount,
             last_bid_time = v_now
-        WHERE id = p_team_id;
+        WHERE id = v_team.id;
+
+        UPDATE public.auction_state
+        SET status = 'sold',
+            bidding_open = false,
+            current_bid = p_bid_amount,
+            highest_bidder_team_id = v_team.id,
+            updated_at = v_now
+        WHERE id = v_state.id;
 
         RETURN jsonb_build_object(
             'success', true,
@@ -194,11 +208,17 @@ BEGIN
         SET current_bid = p_bid_amount,
             current_highest_bidder = v_team.id,
             current_highest_bidder_name = v_team.team_name
-        WHERE id = p_player_id;
+        WHERE id::text = p_player_id;
 
         UPDATE public.teams
         SET last_bid_time = v_now
-        WHERE id = p_team_id;
+        WHERE id = v_team.id;
+
+        UPDATE public.auction_state
+        SET current_bid = p_bid_amount,
+            highest_bidder_team_id = v_team.id,
+            updated_at = v_now
+        WHERE id = v_state.id;
 
         RETURN jsonb_build_object('success', true, 'auto_sold', false);
     END IF;
@@ -222,7 +242,7 @@ BEGIN
     SET active_player_id = p_player_id,
         auction_paused = false,
         updated_at = NOW()
-    WHERE id = 'current';
+    WHERE id IN (SELECT id FROM public.auction_state LIMIT 1);
 
     RETURN jsonb_build_object('success', true);
 END;
@@ -251,7 +271,7 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'No bids placed yet.');
     END IF;
 
-    SELECT * INTO v_team FROM public.teams WHERE id = v_player.current_highest_bidder FOR UPDATE;
+    SELECT * INTO v_team FROM public.teams WHERE id::text = v_player.current_highest_bidder OR id::text ILIKE v_player.current_highest_bidder LIMIT 1 FOR UPDATE;
 
     -- Deduct balance & mark sold
     UPDATE public.teams
@@ -259,8 +279,18 @@ BEGIN
     WHERE id = v_team.id;
 
     UPDATE public.players
-    SET status = 'sold'
+    SET status = 'sold',
+        sold_price = v_player.current_bid,
+        sold_to_team_id = v_team.id
     WHERE id::text = p_player_id;
+
+    UPDATE public.auction_state
+    SET status = 'sold',
+        bidding_open = false,
+        current_bid = v_player.current_bid,
+        highest_bidder_team_id = v_team.id,
+        updated_at = NOW()
+    WHERE id IN (SELECT id FROM public.auction_state LIMIT 1);
 
     RETURN jsonb_build_object('success', true);
 END;
@@ -284,13 +314,17 @@ BEGIN
     SET status = 'unsold',
         current_bid = base_price,
         current_highest_bidder = NULL,
-        current_highest_bidder_name = NULL
+        current_highest_bidder_name = NULL,
+        sold_to_team_id = NULL,
+        sold_price = 0
     WHERE id::text = p_player_id;
 
     UPDATE public.auction_state
     SET active_player_id = NULL,
+        status = 'idle',
+        bidding_open = false,
         updated_at = NOW()
-    WHERE id = 'current';
+    WHERE id IN (SELECT id FROM public.auction_state LIMIT 1);
 
     RETURN jsonb_build_object('success', true);
 END;
@@ -308,7 +342,7 @@ BEGIN
     UPDATE public.auction_state
     SET auction_paused = NOT auction_paused,
         updated_at = NOW()
-    WHERE id = 'current'
+    WHERE id IN (SELECT id FROM public.auction_state LIMIT 1)
     RETURNING auction_paused INTO v_new_paused;
 
     RETURN jsonb_build_object('success', true, 'auction_paused', v_new_paused);
@@ -391,23 +425,24 @@ BEGIN
     -- Seed Teams
     INSERT INTO public.teams (id, team_name, owner_name, owner_email, fire_coin_balance, last_bid_time)
     VALUES
-        ('TEAM_ALPHA', 'POWER HAWKS',  'NX4 SILENT', 'alpha@freefire.auction', 30000, NULL),
-        ('TEAM_BETA',  'TEAM VORTEX',  'MOKSHII FF', 'beta@freefire.auction',  30000, NULL),
-        ('TEAM_GAMMA', 'PENDING',       'TBD',        'gamma@freefire.auction', 30000, NULL),
-        ('TEAM_DELTA', 'PENDING',       'TBD',        'delta@freefire.auction', 30000, NULL)
+        ('TEAM_ALPHA', 'POWER HAWKS',  'NX4 SILENT', 'alpha@freefire.auction', 40000, NULL),
+        ('TEAM_BETA',  'TEAM VORTEX',  'MOKSHII FF', 'beta@freefire.auction',  40000, NULL),
+        ('TEAM_GAMMA', 'Abyssal Ebon', 'invincible', 'gamma@freefire.auction', 40000, NULL),
+        ('TEAM_DELTA', 'RX KUDLA',     'TBD',        'delta@freefire.auction', 40000, NULL)
     ON CONFLICT (id) DO UPDATE
     SET team_name = EXCLUDED.team_name,
         owner_name = EXCLUDED.owner_name,
         owner_email = EXCLUDED.owner_email,
-        fire_coin_balance = 30000,
+        fire_coin_balance = 40000,
         last_bid_time = NULL;
 
     -- Seed Players (Captains strictly pre-assigned; other players upcoming in bidding pool)
     INSERT INTO public.players (id, in_game_name, name, base_price, max_limit, role, is_captain, current_bid, current_highest_bidder, current_highest_bidder_name, sold_to_team_id, sold_price, status)
     VALUES
         -- Permanent Captains
-        ('CAP_NX4_SILENT', 'NX4 SILENT', 'NX4 SILENT', 0, 30000, 'IGL', true, 0, 'alpha_wolves', 'POWER HAWKS', 'alpha_wolves', 0, 'sold'),
-        ('CAP_MOKSHII_FF', 'MOKSHII FF', 'MOKSHII FF', 0, 30000, 'IGL', true, 0, 'beta_strikers', 'TEAM VORTEX', 'beta_strikers', 0, 'sold'),
+        ('CAP_NX4_SILENT', 'NX4 SILENT', 'NX4 SILENT', 0, 40000, 'IGL', true, 0, 'alpha_wolves', 'POWER HAWKS', 'alpha_wolves', 0, 'sold'),
+        ('CAP_MOKSHII_FF', 'MOKSHII FF', 'MOKSHII FF', 0, 40000, 'IGL', true, 0, 'beta_strikers', 'TEAM VORTEX', 'beta_strikers', 0, 'sold'),
+        ('CAP_INVINCIBLE', 'invincible', 'invincible', 0, 40000, 'IGL', true, 0, 'gamma_reapers', 'Abyssal Ebon', 'gamma_reapers', 0, 'sold'),
 
         -- General Auction Pool Players
         ('P001', 'SK_Sabir',     'SK Sabir',     5000, 20000, 'Rusher',    false, 5000, NULL, NULL, NULL, 0, 'upcoming'),

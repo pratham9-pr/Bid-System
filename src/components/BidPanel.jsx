@@ -214,11 +214,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
   const [isLoading, setIsLoading] = useState(false);
   const { players } = useAllPlayers();
 
-  const cleanTeamId = String(team?.id || '').toLowerCase().trim();
-  const isPendingTeam =
-    cleanTeamId.includes('gamma') ||
-    cleanTeamId.includes('delta') ||
-    team?.isPending === true;
+  const isPendingTeam = team?.isPending === true;
 
   if (isPendingTeam) {
     return (
@@ -230,7 +226,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
           Franchise Inactive / Pending
         </h3>
         <p className="text-xs text-slate-400 font-inter mt-1.5 max-w-xs mx-auto leading-relaxed">
-          The auction floor is exclusively live between <span className="text-amber-400 font-bold">POWER HAWKS</span> and <span className="text-sky-400 font-bold">TEAM VORTEX</span>. Bidding controls are disabled for this account.
+          This franchise is currently inactive. Bidding controls are disabled for this account.
         </p>
       </div>
     );
@@ -240,14 +236,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
   const currentBid     = activePlayer?.current_bid ?? 0;
 
   // ── Roster state ────────────────────────────────────────────────────────────
-  const isRosterFull    = isTeamRosterFull(team?.id, players);
-  // Count sold (non-captain) players drafted into this team
-  const draftedPlayers  = (players || []).filter(
-    (p) => p.status === 'sold' && !p.is_captain &&
-           (p.sold_to_team_id === team?.id || p.current_highest_bidder === team?.id) &&
-           (p.sold_price > 0 || p.current_bid > 0) && p.role !== 'IGL'
-  );
-  const remainingSlots  = Math.max(0, MAX_AUCTION_SLOTS - draftedPlayers.length);
+  const { slots, totalCount, remainingSlots, isFull: isRosterFull, captain } = getTeamFullRoster(team?.id, players);
 
   // ── Dynamic max bid (anti-soft-lock formula) ────────────────────────────────
   const dynamicMaxBid   = computeMaxAllowedBid(teamBalance, remainingSlots);
@@ -279,10 +268,19 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
     });
   };
 
+  const isSubmittingRef = useRef(false);
+
   const handleBid = useCallback(async () => {
-    if (!activePlayer || !team) return;
+    if (isSubmittingRef.current || isLoading) return;
+    if (!activePlayer || !team || isSold || !biddingOpen || auctionPaused || isFloorLocked) return;
+
     if (isRosterFull) {
-      onNotify?.({ type: 'error', message: 'Roster is full! You have 1 Captain + 3 Drafted Players.' });
+      onNotify?.({
+        type: 'error',
+        message: captain
+          ? 'Roster is full! You have 1 Captain + 3 Drafted Players.'
+          : 'Roster is full! All 4 player slots are filled.',
+      });
       return;
     }
     const amount = Number(bidAmount);
@@ -312,31 +310,36 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
     if (amount > effectiveMax) {
       onNotify?.({
         type: 'error',
-        message: `Max allowed bid is ₣${effectiveMax.toLocaleString()} FC — you need to keep ₣${MIN_BASE_PRICE.toLocaleString()} reserved for each remaining slot.`,
+        message: `Max allowed bid is ₣${effectiveMax.toLocaleString()} FC — you need to keep ₣${MIN_BASE_PRICE.toLocaleString()} reserved for each remaining open slot.`,
       });
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsLoading(true);
-    const result = await placeBid(activePlayer.id, team.id, amount);
-    setIsLoading(false);
+    try {
+      const result = await placeBid(activePlayer.id, team.id, amount);
 
-    if (result.success) {
-      if (result.auto_sold) {
-        onNotify?.({ type: 'success', message: `🏆 MAX CAP REACHED! Player auto-sold at ₣${amount.toLocaleString()} FC!` });
+      if (result.success) {
+        if (result.auto_sold) {
+          onNotify?.({ type: 'success', message: `🏆 MAX CAP REACHED! Player auto-sold at ₣${amount.toLocaleString()} FC!` });
+        } else {
+          onNotify?.({ type: 'success', message: `Bid of ₣${amount.toLocaleString()} placed!` });
+        }
       } else {
-        onNotify?.({ type: 'success', message: `Bid of ₣${amount.toLocaleString()} placed!` });
+        const msg = result.error || 'Bid failed.';
+        if (msg.startsWith('COOLDOWN_ACTIVE:')) {
+          const rem = msg.split(':')[1];
+          onNotify?.({ type: 'cooldown', message: `Server cooldown active — ${rem}s remaining` });
+        } else {
+          onNotify?.({ type: 'error', message: msg });
+        }
       }
-    } else {
-      const msg = result.error || 'Bid failed.';
-      if (msg.startsWith('COOLDOWN_ACTIVE:')) {
-        const rem = msg.split(':')[1];
-        onNotify?.({ type: 'cooldown', message: `Server cooldown active — ${rem}s remaining` });
-      } else {
-        onNotify?.({ type: 'error', message: msg });
-      }
+    } finally {
+      setIsLoading(false);
+      isSubmittingRef.current = false;
     }
-  }, [bidAmount, activePlayer, team, teamBalance, effectiveMax, isRosterFull, onNotify]);
+  }, [bidAmount, activePlayer, team, teamBalance, effectiveMax, isRosterFull, onNotify, captain, isLoading, isSold, biddingOpen, auctionPaused, isFloorLocked]);
 
   return (
     <div className="card-elevated p-5 flex flex-col gap-4">
@@ -374,7 +377,9 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
               Team Roster Complete (4/4)
             </p>
             <p className="text-[9px] text-slate-300 font-inter mt-0.5">
-              Your franchise has acquired 1 Captain + 3 Drafted Players. Bidding is complete!
+              {captain
+                ? 'Your franchise has acquired 1 Captain + 3 Drafted Players. Bidding is complete!'
+                : 'Your franchise has acquired 4 Drafted Players. Roster is complete!'}
             </p>
           </div>
         </div>

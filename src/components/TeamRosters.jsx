@@ -224,36 +224,6 @@ function TeamRosterCard({ team, allPlayers, onAppoint }) {
   const isLow      = !isBankrupt && (team.fire_coin_balance ?? 0) < 500;
   const teamLogo   = getTeamLogoUrl(teamId);
 
-  if (isPendingTeam) {
-    return (
-      <div className="card-elevated p-6 opacity-40 border border-slate-700/50 bg-surface-900/40 relative overflow-hidden rounded-2xl grayscale hover:grayscale-0 transition-all">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl overflow-hidden bg-black/40 border border-white/5 p-1 flex-shrink-0">
-              <img src={teamLogo} alt="" className="w-full h-full object-contain opacity-40" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-rajdhani font-black text-lg text-slate-400">
-                  {getTeamDisplayName(team.id, team.name || team.team_name)}
-                </h3>
-                <span className="px-2 py-0.5 rounded bg-red-950/60 text-red-400/90 border border-red-500/30 text-[9px] font-rajdhani font-black uppercase tracking-wider">
-                  🔒 CLOSED / INACTIVE FOR DRAFT
-                </span>
-              </div>
-              <p className="text-[10px] text-muted font-inter mt-0.5">
-                Franchise Inactive · No captain or draft slots allocated
-              </p>
-            </div>
-          </div>
-          <span className="text-xs font-rajdhani font-black text-slate-500 uppercase tracking-widest bg-black/40 px-2.5 py-1 rounded border border-white/5">
-            INACTIVE
-          </span>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className={`card-elevated overflow-hidden flex flex-col transition-all duration-300 relative
@@ -328,7 +298,7 @@ function TeamRosterCard({ team, allPlayers, onAppoint }) {
         </div>
       </div>
 
-      {/* ── 4-Player Roster Grid (Slot 1 Captain + Slots 2,3,4 Draft) ─────── */}
+      {/* ── 4-Player Roster Grid ─────────────────────────────────────────── */}
       <div className="p-4 flex-1 relative z-10">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {slots.map((player, idx) => (
@@ -336,7 +306,7 @@ function TeamRosterCard({ team, allPlayers, onAppoint }) {
               key={player?.id ? `roster-${teamId}-${player.id}` : `empty-${teamId}-slot-${idx}`}
               player={player}
               slotIndex={idx}
-              isCaptain={idx === 0}
+              isCaptain={Boolean(captain && idx === 0)}
               teamId={teamId}
               teamName={team.name || team.team_name}
               allPlayers={allPlayers}
@@ -357,7 +327,7 @@ export function TeamRosters({ teams, players, loading, onAppoint }) {
   const [resetMsg, setResetMsg]   = useState(null);
 
   const handleResetAll = async () => {
-    if (!window.confirm('Are you sure you want to completely empty all franchise rosters & captains? All players will be restored to upcoming and team balances set to 30,000 FC.')) {
+    if (!window.confirm('Are you sure you want to completely empty all franchise rosters & reset balances to 40,000 FC?')) {
       return;
     }
     setResetting(true);

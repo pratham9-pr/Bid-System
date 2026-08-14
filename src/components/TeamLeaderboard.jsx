@@ -3,9 +3,9 @@ import { getTeamDisplayName, getTeamOwner } from '../config/teamsConfig';
 
 const medals = ['🥇', '🥈', '🥉'];
 
-export function TeamLeaderboard({ teams }) {
-  const sorted = [...teams].sort((a, b) => b.fire_coin_balance - a.fire_coin_balance);
-  const maxBalance = sorted[0]?.fire_coin_balance || 1;
+export function TeamLeaderboard({ teams = [] }) {
+  const sorted = [...(teams || [])].sort((a, b) => (b.fire_coin_balance ?? 0) - (a.fire_coin_balance ?? 0));
+  const maxBalance = sorted[0]?.fire_coin_balance || 40000;
 
   return (
     <div className="card-elevated overflow-hidden">
@@ -16,7 +16,8 @@ export function TeamLeaderboard({ teams }) {
 
       <div className="divide-y divide-surface-600/30">
         {sorted.map((team, index) => {
-          const pct = (team.fire_coin_balance / maxBalance) * 100;
+          const balance = team.fire_coin_balance ?? 0;
+          const pct = Math.min(100, Math.max(0, (balance / maxBalance) * 100));
           return (
             <div key={team.id} className="px-5 py-4 flex items-center gap-4 hover:bg-surface-700/30 transition-colors">
               {/* Rank */}
@@ -35,7 +36,7 @@ export function TeamLeaderboard({ teams }) {
                   </span>
                   <span className={`font-rajdhani font-bold text-base
                     ${index === 0 ? 'text-gold-400' : 'text-slate-300'}`}>
-                    ₣{team.fire_coin_balance.toLocaleString()}
+                    ₣{balance.toLocaleString()}
                   </span>
                 </div>
                 {/* Balance bar */}
@@ -56,7 +57,7 @@ export function TeamLeaderboard({ teams }) {
         })}
       </div>
 
-      {teams.length === 0 && (
+      {(!teams || teams.length === 0) && (
         <div className="px-5 py-10 text-center text-muted font-inter text-sm">
           No teams loaded
         </div>

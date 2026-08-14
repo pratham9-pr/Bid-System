@@ -5,6 +5,17 @@ import { supabase } from '../config/supabase';
  * useAllTeams (Supabase Realtime)
  * Fetches all teams sorted by fire_coin_balance descending.
  */
+function normalizeTeam(t) {
+  if (!t) return t;
+  let balance = typeof t.fire_coin_balance === 'number' ? t.fire_coin_balance : 40000;
+  // If legacy balance exceeds 40,000 (e.g. 50,000 starting or 48,000 where 2000 was spent), recalculate from 40k base
+  if (balance > 40000) {
+    const spent = Math.max(0, 50000 - balance);
+    balance = Math.max(0, 40000 - spent);
+  }
+  return { ...t, fire_coin_balance: balance };
+}
+
 export function useAllTeams() {
   const [teams,   setTeams]   = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,13 +23,42 @@ export function useAllTeams() {
 
   const fetchTeams = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: teamRows, error: teamErr } = await supabase
         .from('teams')
         .select('*')
         .order('fire_coin_balance', { ascending: false });
 
-      if (error) throw error;
-      setTeams(data || []);
+      if (teamErr) throw teamErr;
+
+      // Fetch drafted players to calculate true spent amount
+      const { data: playersData } = await supabase
+        .from('players')
+        .select('id, sold_to_team_id, current_highest_bidder, sold_price, current_bid, is_captain, status, role');
+
+      const normalized = (teamRows || []).map((t) => {
+        const teamDrafted = (playersData || []).filter(
+          (p) =>
+            p.status === 'sold' &&
+            !p.is_captain &&
+            p.role !== 'IGL' &&
+            (p.sold_price > 0 || p.current_bid > 0) &&
+            (String(p.sold_to_team_id) === String(t.id) || String(p.current_highest_bidder) === String(t.id))
+        );
+        const spent = teamDrafted.reduce((sum, p) => sum + (p.sold_price || p.current_bid || 0), 0);
+        const balance = Math.max(0, 40000 - spent);
+        return { ...t, fire_coin_balance: balance };
+      });
+
+      setTeams(normalized);
+
+      // Auto-correct any database discrepancies to 40k minus spent
+      for (const t of normalized) {
+        if (t.fire_coin_balance !== 40000 && (!playersData || playersData.length === 0)) {
+          supabase.from('teams').update({ fire_coin_balance: 40000 }).eq('id', t.id).then(() => {});
+        } else {
+          supabase.from('teams').update({ fire_coin_balance: t.fire_coin_balance }).eq('id', t.id).then(() => {});
+        }
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -35,16 +75,14 @@ export function useAllTeams() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'teams' },
-        (payload) => {
-          if (payload.eventType === 'UPDATE' && payload.new) {
-            setTeams((prev) =>
-              prev.map((t) =>
-                String(t.id) === String(payload.new.id) ? { ...t, ...payload.new } : t
-              )
-            );
-          } else if (payload.eventType === 'INSERT' && payload.new) {
-            setTeams((prev) => [...prev, payload.new]);
-          }
+        () => {
+          fetchTeams();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'players' },
+        () => {
           fetchTeams();
         }
       )

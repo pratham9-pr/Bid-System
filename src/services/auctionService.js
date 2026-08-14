@@ -1,8 +1,8 @@
 import { supabase } from '../config/supabase';
 
 // ─── GLOBAL AUCTION CONSTRAINTS ───────────────────────────────────────────────
-export const MAX_BID_LIMIT       = 30000; // 30,000 FC global auto-sell cap (hard ceiling)
-export const DEFAULT_TEAM_PURSE  = 30000; // 30,000 FC starting team purse
+export const MAX_BID_LIMIT       = 40000; // 40,000 FC global auto-sell cap (hard ceiling)
+export const DEFAULT_TEAM_PURSE  = 40000; // 40,000 FC starting team purse
 export const MIN_BASE_PRICE      = 3000;  // Lowest possible player base price — used in max-bid formula
 
 /**
@@ -44,24 +44,42 @@ export function isActiveFranchise(teamId) {
     clean === 'power_hawks' ||
     clean === 'power hawks' ||
     clean === 'alpha' ||
+    clean === '1' ||
     clean === 'beta_strikers' ||
     clean === 'team_beta' ||
     clean === 'team_vortex' ||
     clean === 'team vortex' ||
     clean === 'beta' ||
-    clean === 'vortex'
+    clean === 'vortex' ||
+    clean === '2' ||
+    clean === 'gamma_reapers' ||
+    clean === 'team_gamma' ||
+    clean === 'abyssal_ebon' ||
+    clean === 'abyssal ebon' ||
+    clean === 'abyssal' ||
+    clean === 'ebon' ||
+    clean === 'gamma' ||
+    clean === '3' ||
+    clean === 'delta_phantoms' ||
+    clean === 'team_delta' ||
+    clean === 'rx_kudla' ||
+    clean === 'rx kudla' ||
+    clean === 'rx' ||
+    clean === 'kudla' ||
+    clean === 'delta' ||
+    clean === '4'
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  PLACE BID (Atomic Transaction RPC with 30,000 FC Max Cap Auto-Sell)
+//  PLACE BID (Atomic Transaction RPC with 40,000 FC Max Cap Auto-Sell)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function placeBid(playerId, teamId, bidAmount) {
   try {
     if (!isActiveFranchise(teamId)) {
       return {
         success: false,
-        error: 'Only active franchises (POWER HAWKS and TEAM VORTEX) can participate in bidding.',
+        error: 'Only active registered franchise teams can participate in bidding.',
       };
     }
 
@@ -702,6 +720,7 @@ export async function resetAllRostersAndCaptains() {
         const pName = (p.in_game_name || p.name || '').toLowerCase().trim();
         const isNx4 = pName.includes('nx4') || pName.includes('silent') || p.id === 'CAP_NX4_SILENT';
         const isMokshii = pName.includes('mokshii') || p.id === 'CAP_MOKSHII_FF';
+        const isInvincible = pName.includes('invincible') || p.id === 'CAP_INVINCIBLE';
 
         if (isNx4) {
           // Lock NX4 SILENT as Permanent Captain for POWER HAWKS
@@ -727,6 +746,18 @@ export async function resetAllRostersAndCaptains() {
             sold_price:                  0,
             current_bid:                 0,
           });
+        } else if (isInvincible) {
+          // Lock invincible as Permanent Captain for Abyssal Ebon
+          await safeUpdatePlayer(p.id, {
+            status:                      'sold',
+            is_captain:                  true,
+            role:                        'IGL',
+            sold_to_team_id:             'gamma_reapers',
+            current_highest_bidder:      'gamma_reapers',
+            current_highest_bidder_name: 'Abyssal Ebon',
+            sold_price:                  0,
+            current_bid:                 0,
+          });
         } else {
           // General Auction Pool Player
           await safeUpdatePlayer(p.id, {
@@ -742,11 +773,34 @@ export async function resetAllRostersAndCaptains() {
       }
     }
 
-    // 2. Reset team balances to default purse (30,000 FC)
+    // 2. Reset team balances to default purse (40,000 FC) and sync names
     await supabase.from('teams').update({
+      team_name:         'POWER HAWKS',
+      owner_name:        'NX4 SILENT',
       fire_coin_balance: DEFAULT_TEAM_PURSE,
       last_bid_time:     null,
-    }).neq('id', '___NEVER_MATCH___');
+    }).or('id.eq.alpha_wolves,id.eq.TEAM_ALPHA');
+
+    await supabase.from('teams').update({
+      team_name:         'TEAM VORTEX',
+      owner_name:        'MOKSHII FF',
+      fire_coin_balance: DEFAULT_TEAM_PURSE,
+      last_bid_time:     null,
+    }).or('id.eq.beta_strikers,id.eq.TEAM_BETA');
+
+    await supabase.from('teams').update({
+      team_name:         'Abyssal Ebon',
+      owner_name:        'invincible',
+      fire_coin_balance: DEFAULT_TEAM_PURSE,
+      last_bid_time:     null,
+    }).or('id.eq.gamma_reapers,id.eq.TEAM_GAMMA');
+
+    await supabase.from('teams').update({
+      team_name:         'RX KUDLA',
+      owner_name:        'TBD',
+      fire_coin_balance: DEFAULT_TEAM_PURSE,
+      last_bid_time:     null,
+    }).or('id.eq.delta_phantoms,id.eq.TEAM_DELTA');
 
     // 3. Reset auction state
     await safeUpdateAuctionState({
@@ -771,9 +825,24 @@ export async function resetAllRostersAndCaptains() {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function seedDatabase() {
   try {
-    const { data, error } = await supabase.rpc('seed_auction_data');
-    if (error) return { success: false, error: error.message };
-    return data;
+    let rpcRes = null;
+    try {
+      const { data, error } = await supabase.rpc('seed_auction_data');
+      if (!error) rpcRes = data;
+    } catch (e) {
+      console.warn('RPC seed warning:', e);
+    }
+
+    // Direct guarantee: Reset all team balances to 40,000 FC, assign permanent captains
+    const resetRes = await resetAllRostersAndCaptains();
+    if (!resetRes.success && !rpcRes) {
+      return { success: false, error: resetRes.error };
+    }
+
+    return {
+      success: true,
+      message: rpcRes?.message || 'All teams successfully reset to ₣40,000 FC starting purse!',
+    };
   } catch (err) {
     return { success: false, error: err.message };
   }

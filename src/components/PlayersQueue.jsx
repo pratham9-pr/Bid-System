@@ -48,7 +48,7 @@ export function PlayersQueue({ players, activePlayerId }) {
           {player.photo_url ? (
             <img
               src={player.photo_url}
-              alt={player.in_game_name}
+              alt={player.in_game_name || player.name || 'Player'}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -57,7 +57,7 @@ export function PlayersQueue({ players, activePlayerId }) {
               ${isActive ? 'bg-fire-500/20 text-fire-400'
               : player.status === 'sold' ? 'bg-gold-500/15 text-gold-400'
               : 'bg-surface-600 text-muted'}`}>
-              {player.in_game_name.charAt(0).toUpperCase()}
+              {(player.in_game_name || player.name || '?').charAt(0).toUpperCase()}
             </div>
           )}
         </div>
@@ -66,7 +66,7 @@ export function PlayersQueue({ players, activePlayerId }) {
         <div className="flex-1 min-w-0">
           <span className={`font-rajdhani font-semibold text-sm truncate block
             ${isActive ? 'text-fire-300' : player.status === 'sold' ? 'text-gold-400' : 'text-slate-300'}`}>
-            {player.in_game_name}
+            {player.in_game_name || player.name || 'Unknown'}
           </span>
           {player.role && (
             <div className="mt-0.5">
@@ -122,7 +122,7 @@ export function PlayersQueue({ players, activePlayerId }) {
                 {p.current_highest_bidder_name && (
                   <div className="px-2.5 pb-1.5 -mt-0.5">
                     <span className="text-[10px] text-gold-500/70 font-inter">
-                      → {p.current_highest_bidder_name} · ₣{p.current_bid.toLocaleString()}
+                      → {p.current_highest_bidder_name} · ₣{(p.current_bid || p.sold_price || 0).toLocaleString()}
                     </span>
                   </div>
                 )}
@@ -131,7 +131,7 @@ export function PlayersQueue({ players, activePlayerId }) {
           </>
         )}
 
-        {players.length === 0 && (
+        {(!players || players.length === 0) && (
           <div className="flex items-center justify-center h-32 text-muted text-sm font-inter">
             No players loaded
           </div>

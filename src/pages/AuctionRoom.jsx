@@ -91,7 +91,7 @@ export default function AuctionRoom() {
                           bg-surface-700 border border-surface-500/50">
             <span className="text-gold-400 font-rajdhani font-bold text-sm">₣</span>
             <span className="font-rajdhani font-bold text-sm text-white tabular-nums">
-              {displayTeam.fire_coin_balance?.toLocaleString()}
+              {(displayTeam.fire_coin_balance ?? 0).toLocaleString()}
             </span>
           </div>
           <button

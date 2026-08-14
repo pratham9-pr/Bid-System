@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAllTeams } from '../hooks/useAllTeams';
+import { useAllPlayers } from '../hooks/useAllPlayers';
+import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
+import { getTeamDisplayName } from '../config/teamsConfig';
 
 // ─── Animated Number Hook ────────────────────────────────────────────────────
 // Interpolates from the previous value to the new value using a cubic ease-out
@@ -38,10 +41,6 @@ function useAnimatedNumber(target, duration = 700) {
 
   return displayed;
 }
-
-import { useAllPlayers } from '../hooks/useAllPlayers';
-import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
-import { getTeamDisplayName } from '../config/teamsConfig';
 
 // ─── Team Row ────────────────────────────────────────────────────────────────
 function TeamRow({ team, rank, players = [] }) {
@@ -166,11 +165,12 @@ export function CompetitorSidebar({ currentTeamId }) {
   const { teams, loading } = useAllTeams();
   const { players } = useAllPlayers();
 
-  // Rank sorted by descending balance
-  const ranked = [...teams].sort((a, b) => (b.fire_coin_balance ?? 0) - (a.fire_coin_balance ?? 0));
+  // Rank sorted by descending balance across active franchises
+  const activeTeams = teams.filter((t) => t.isPending !== true);
+  const ranked = [...activeTeams].sort((a, b) => (b.fire_coin_balance ?? 0) - (a.fire_coin_balance ?? 0));
 
-  const bankruptCount = teams.filter((t) => (t.fire_coin_balance ?? 0) === 0).length;
-  const warningCount  = teams.filter((t) => {
+  const bankruptCount = activeTeams.filter((t) => (t.fire_coin_balance ?? 0) === 0).length;
+  const warningCount  = activeTeams.filter((t) => {
     const b = t.fire_coin_balance ?? 0;
     return b > 0 && b < 500;
   }).length;
