@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAuctionRoom } from '../hooks/useAuctionRoom';
@@ -12,12 +12,14 @@ import { getTeamDisplayName } from '../config/teamsConfig';
 import { Notification }       from '../components/Notification';
 
 export default function AuctionRoom() {
-  const { team, signOut } = useAuth();
-  const navigate          = useNavigate();
+  const { team, currentUser, loading: authLoading, signOut } = useAuth();
+  const navigate = useNavigate();
 
-  const { activePlayer, team: liveTeam, auctionPaused, isRevealed, biddingOpen, loading, error } = useAuctionRoom(team?.id);
+  const effectiveTeam = team || (currentUser?.role === 'bidder' ? currentUser : null);
+
+  const { activePlayer, team: liveTeam, auctionPaused, isRevealed, biddingOpen, loading, error } = useAuctionRoom(effectiveTeam?.id || effectiveTeam?.teamId);
   const { players, auctionPlayers }  = useAllPlayers();
-  const [notification, setNotification]                   = useState(null);
+  const [notification, setNotification] = useState(null);
 
   const handleNotify  = useCallback((n) => setNotification(n), []);
   const handleDismiss = useCallback(() => setNotification(null), []);
@@ -27,13 +29,22 @@ export default function AuctionRoom() {
     navigate('/');
   };
 
-  if (!team) {
-    navigate('/');
-    return null;
+  useEffect(() => {
+    if (!authLoading && !effectiveTeam) {
+      navigate('/');
+    }
+  }, [effectiveTeam, authLoading, navigate]);
+
+  if (authLoading || !effectiveTeam) {
+    return (
+      <div className="min-h-screen bg-[#06070c] flex items-center justify-center">
+        <div className="w-10 h-10 rounded-2xl border-2 border-fire-500/30 border-t-fire-500 animate-spin" />
+      </div>
+    );
   }
 
-  // Live Firestore doc gives real-time balance; fall back to auth-cached team
-  const displayTeam = liveTeam || team;
+  // Live Firestore/Supabase doc gives real-time balance; fall back to auth-cached team
+  const displayTeam = liveTeam || effectiveTeam;
 
   return (
     <div className="min-h-screen bg-surface-gradient flex flex-col">

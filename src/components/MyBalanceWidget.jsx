@@ -134,9 +134,9 @@ export function MyBalanceWidget({ team }) {
                       : p
                       ? 'bg-gold-500/20 border border-gold-500/40 text-gold-300'
                       : 'bg-surface-800/80 border border-dashed border-surface-600 text-muted'}`}
-                  title={isCap ? `Captain: ${p.name}` : p ? p.in_game_name || p.name : `Slot #${idx + 1} Open`}
+                  title={isCap ? `Captain: ${p?.name || 'Captain'}` : p ? p.in_game_name || p.name : `Slot #${idx + 1} Open`}
                 >
-                  {isCap ? `👑 ${p.name?.split(' ')[0] || 'Cap'}` : p ? p.in_game_name || p.name : `#${idx + 1}`}
+                  {isCap ? `👑 ${p?.name?.split(' ')[0] || 'Cap'}` : p ? p.in_game_name || p.name : `#${idx + 1}`}
                 </div>
               );
             })}
