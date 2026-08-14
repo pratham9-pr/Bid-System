@@ -120,8 +120,9 @@ export function useAuctionRoom(teamId) {
     init();
 
     // 2. Realtime Subscriptions via Supabase Channel
+    const channelId = `auction_room_sub_${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
-      .channel('auction_room_channel')
+      .channel(channelId)
       // Auction state changes
       .on(
         'postgres_changes',

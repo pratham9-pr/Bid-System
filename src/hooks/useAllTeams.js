@@ -29,12 +29,22 @@ export function useAllTeams() {
   useEffect(() => {
     fetchTeams();
 
+    const channelId = `all_teams_sub_${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
-      .channel('all_teams_realtime')
+      .channel(channelId)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'teams' },
-        () => {
+        (payload) => {
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            setTeams((prev) =>
+              prev.map((t) =>
+                String(t.id) === String(payload.new.id) ? { ...t, ...payload.new } : t
+              )
+            );
+          } else if (payload.eventType === 'INSERT' && payload.new) {
+            setTeams((prev) => [...prev, payload.new]);
+          }
           fetchTeams();
         }
       )

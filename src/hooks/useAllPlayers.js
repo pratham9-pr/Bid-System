@@ -46,16 +46,51 @@ export function useAllPlayers() {
   useEffect(() => {
     fetchPlayers();
 
+    // Shared real-time channel with unique listener instance
+    const channelId = `all_players_sub_${Math.random().toString(36).substring(2, 9)}`;
     const channel = supabase
-      .channel('all_players_realtime')
+      .channel(channelId)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'players' },
-        () => { fetchPlayers(); }
+        (payload) => {
+          // 1. Instantly apply realtime payload into React state without waiting for network re-fetch
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            setPlayers((prev) => {
+              const updatedId = String(payload.new.id);
+              const exists = prev.some((p) => String(p.id) === updatedId);
+              if (exists) {
+                return prev.map((p) =>
+                  String(p.id) === updatedId ? { ...p, ...payload.new } : p
+                );
+              }
+              return [...prev, payload.new];
+            });
+          } else if (payload.eventType === 'INSERT' && payload.new) {
+            setPlayers((prev) => {
+              const newId = String(payload.new.id);
+              if (prev.some((p) => String(p.id) === newId)) {
+                return prev.map((p) =>
+                  String(p.id) === newId ? { ...p, ...payload.new } : p
+                );
+              }
+              return [...prev, payload.new];
+            });
+          } else if (payload.eventType === 'DELETE' && payload.old) {
+            setPlayers((prev) =>
+              prev.filter((p) => String(p.id) !== String(payload.old.id))
+            );
+          }
+
+          // 2. Fetch full sync in background
+          fetchPlayers();
+        }
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // ── Derived lists ──────────────────────────────────────────────────────────
