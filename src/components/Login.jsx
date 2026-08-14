@@ -109,38 +109,42 @@ export function Login({ onSuccess }) {
 
           {/* 2x2 Team Grid with Low-Opacity Background Watermark Logos */}
           <div className="grid grid-cols-2 gap-3">
-            {TEAMS_CONFIG.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => handleSelectRole(t.id)}
-                className={`relative overflow-hidden group p-4 rounded-2xl border min-h-[96px]
-                           transition-all duration-300 active:scale-95 text-center cursor-pointer ${t.color}`}
-              >
-                {/* ── Background Watermark Logo (15% - 25% Opacity) ──── */}
-                <img
-                  src={t.logo}
-                  alt=""
-                  aria-hidden="true"
-                  onError={(e) => {
-                    if (t.fallbackLogo && e.currentTarget.src !== t.fallbackLogo) {
-                      e.currentTarget.src = t.fallbackLogo;
-                    }
-                  }}
-                  className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none z-0 mix-blend-screen transition-transform duration-500 group-hover:scale-110 group-hover:opacity-30"
-                />
+            {TEAMS_CONFIG.map((t) => {
+              const isPending = t.isPending === true;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => !isPending && handleSelectRole(t.id)}
+                  disabled={isPending}
+                  className={`relative overflow-hidden group p-4 rounded-2xl border min-h-[96px]
+                             transition-all duration-300 ${isPending ? 'opacity-40 cursor-not-allowed grayscale' : 'active:scale-95 cursor-pointer'} ${t.color}`}
+                >
+                  {/* ── Background Watermark Logo (15% - 25% Opacity) ──── */}
+                  <img
+                    src={t.logo}
+                    alt=""
+                    aria-hidden="true"
+                    onError={(e) => {
+                      if (t.fallbackLogo && e.currentTarget.src !== t.fallbackLogo) {
+                        e.currentTarget.src = t.fallbackLogo;
+                      }
+                    }}
+                    className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none z-0 mix-blend-screen transition-transform duration-500 group-hover:scale-110 group-hover:opacity-30"
+                  />
 
-                {/* ── Protected Text Layer ───────────────────────────── */}
-                <div className="relative z-10 flex flex-col items-center justify-center h-full">
-                  <h3 className="font-rajdhani font-black text-sm tracking-wider uppercase text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                    {t.name}
-                  </h3>
-                  <p className="text-[10px] text-slate-300 font-inter mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-                    Owner: {t.owner}
-                  </p>
-                </div>
-              </button>
-            ))}
+                  {/* ── Protected Text Layer ───────────────────────────── */}
+                  <div className="relative z-10 flex flex-col items-center justify-center h-full">
+                    <h3 className="font-rajdhani font-black text-sm tracking-wider uppercase text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                      {t.name}
+                    </h3>
+                    <p className="text-[10px] text-slate-300 font-inter mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+                      {isPending ? '🔒 Locked Franchise' : `Owner: ${t.owner}`}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {/* Minimalist Discrete Host/Admin Button */}

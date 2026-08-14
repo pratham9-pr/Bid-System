@@ -343,11 +343,16 @@ export default function AdminPanel() {
                       <option value="" disabled className="bg-surface-900 text-muted">
                         — Select a Franchise Team —
                       </option>
-                      {(teams.length > 0 ? teams : TEAMS_CONFIG).map((t) => (
-                        <option key={t.id} value={t.id} className="bg-surface-900 text-white">
-                          {getTeamDisplayName(t.id, t.team_name || t.name)}
-                        </option>
-                      ))}
+                      {(teams.length > 0 ? teams : TEAMS_CONFIG)
+                        .filter((t) => {
+                          const clean = String(t.id).toLowerCase();
+                          return clean !== 'gamma_reapers' && clean !== 'delta_phantoms' && clean !== 'team_gamma' && clean !== 'team_delta';
+                        })
+                        .map((t) => (
+                          <option key={t.id} value={t.id} className="bg-surface-900 text-white font-rajdhani font-bold">
+                            {getTeamDisplayName(t.id, t.team_name || t.name)}
+                          </option>
+                        ))}
                     </select>
                     {/* Dropdown chevron */}
                     <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gold-400">

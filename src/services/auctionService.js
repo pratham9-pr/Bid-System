@@ -35,11 +35,36 @@ const safeStr   = (v) => (v != null && String(v).trim() !== '' ? String(v).trim(
 // auction_state always has id = 1 (integer) — never pass "current"
 const STATE_ROW = 1;
 
+export function isActiveFranchise(teamId) {
+  if (!teamId) return false;
+  const clean = String(teamId).toLowerCase().trim();
+  return (
+    clean === 'alpha_wolves' ||
+    clean === 'team_alpha' ||
+    clean === 'power_hawks' ||
+    clean === 'power hawks' ||
+    clean === 'alpha' ||
+    clean === 'beta_strikers' ||
+    clean === 'team_beta' ||
+    clean === 'team_vortex' ||
+    clean === 'team vortex' ||
+    clean === 'beta' ||
+    clean === 'vortex'
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  PLACE BID (Atomic Transaction RPC with 30,000 FC Max Cap Auto-Sell)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function placeBid(playerId, teamId, bidAmount) {
   try {
+    if (!isActiveFranchise(teamId)) {
+      return {
+        success: false,
+        error: 'Only active franchises (POWER HAWKS and TEAM VORTEX) can participate in bidding.',
+      };
+    }
+
     const numericBid = Math.min(MAX_BID_LIMIT, safeNum(bidAmount));
 
     const { data, error } = await supabase.rpc('place_bid', {
@@ -589,20 +614,31 @@ export async function appointTeamCaptain(playerId, teamId, teamName) {
       tName = tData?.name || tData?.team_name || tId;
     }
 
-    // 1. Clear any prior captain for this team
+    // 1. Release any prior captain of this team so they return to the auction pool
     try {
-      await supabase
+      const { data: priorPlayers } = await supabase
         .from('players')
-        .update({
-          is_captain:                  false,
-          status:                      'upcoming',
-          current_highest_bidder:      null,
-          current_highest_bidder_name: null,
-          sold_to_team_id:             null,
-        })
-        .or(`current_highest_bidder.eq.${tId},sold_to_team_id.eq.${tId}`);
+        .select('id, is_captain, role, current_bid')
+        .or(`sold_to_team_id.eq.${tId},current_highest_bidder.eq.${tId}`)
+        .neq('id', pId);
+
+      if (priorPlayers && priorPlayers.length > 0) {
+        for (const prev of priorPlayers) {
+          // Release prior captains (0-bid / IGL)
+          if (prev.is_captain || prev.role === 'IGL' || prev.current_bid === 0) {
+            await safeUpdatePlayer(prev.id, {
+              is_captain:                  false,
+              status:                      'upcoming',
+              current_highest_bidder:      null,
+              current_highest_bidder_name: null,
+              sold_to_team_id:             null,
+              sold_price:                  0,
+            });
+          }
+        }
+      }
     } catch (e) {
-      // Ignore if fallback needed
+      console.warn('Prior captain reset warning:', e);
     }
 
     // 2. Appoint new captain: role='IGL', is_captain=true, status='sold', locked into team
@@ -659,19 +695,50 @@ export async function removePlayerFromRoster(playerId) {
 export async function resetAllRostersAndCaptains() {
   try {
     // 1. Fetch all players to reset their bids to their own base_price
-    const { data: allP } = await supabase.from('players').select('id, base_price');
+    const { data: allP } = await supabase.from('players').select('id, in_game_name, name, base_price');
 
     if (allP && allP.length > 0) {
       for (const p of allP) {
-        await safeUpdatePlayer(p.id, {
-          status:                      'upcoming',
-          is_captain:                  false,
-          sold_to_team_id:             null,
-          sold_price:                  0,
-          current_highest_bidder:      null,
-          current_highest_bidder_name: null,
-          current_bid:                 p.base_price || 0,
-        });
+        const pName = (p.in_game_name || p.name || '').toLowerCase().trim();
+        const isNx4 = pName.includes('nx4') || pName.includes('silent') || p.id === 'CAP_NX4_SILENT';
+        const isMokshii = pName.includes('mokshii') || p.id === 'CAP_MOKSHII_FF';
+
+        if (isNx4) {
+          // Lock NX4 SILENT as Permanent Captain for POWER HAWKS
+          await safeUpdatePlayer(p.id, {
+            status:                      'sold',
+            is_captain:                  true,
+            role:                        'IGL',
+            sold_to_team_id:             'alpha_wolves',
+            current_highest_bidder:      'alpha_wolves',
+            current_highest_bidder_name: 'POWER HAWKS',
+            sold_price:                  0,
+            current_bid:                 0,
+          });
+        } else if (isMokshii) {
+          // Lock MOKSHII FF as Permanent Captain for TEAM VORTEX
+          await safeUpdatePlayer(p.id, {
+            status:                      'sold',
+            is_captain:                  true,
+            role:                        'IGL',
+            sold_to_team_id:             'beta_strikers',
+            current_highest_bidder:      'beta_strikers',
+            current_highest_bidder_name: 'TEAM VORTEX',
+            sold_price:                  0,
+            current_bid:                 0,
+          });
+        } else {
+          // General Auction Pool Player
+          await safeUpdatePlayer(p.id, {
+            status:                      'upcoming',
+            is_captain:                  false,
+            sold_to_team_id:             null,
+            sold_price:                  0,
+            current_highest_bidder:      null,
+            current_highest_bidder_name: null,
+            current_bid:                 p.base_price || 0,
+          });
+        }
       }
     }
 

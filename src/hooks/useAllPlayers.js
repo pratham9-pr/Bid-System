@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
+import { isPermanentCaptainName } from '../config/franchiseCaptains';
 
 /**
  * useAllPlayers (Supabase Realtime)
@@ -58,10 +59,17 @@ export function useAllPlayers() {
   }, []);
 
   // ── Derived lists ──────────────────────────────────────────────────────────
-  // auctionPlayers: captains are permanently excluded from the bidding pool
-  const auctionPlayers = players.filter((p) => !p.is_captain);
-  // captains: only explicitly-appointed captain rows
-  const captains       = players.filter((p) => p.is_captain === true);
+  // auctionPlayers: permanent captains (NX4 SILENT, MOKSHII FF) & any appointed captains are strictly excluded from general bidding
+  const auctionPlayers = players.filter(
+    (p) =>
+      !p.is_captain &&
+      !isPermanentCaptainName(p.in_game_name || p.name)
+  );
+
+  // captains: explicitly-appointed captain rows
+  const captains = players.filter(
+    (p) => p.is_captain === true || isPermanentCaptainName(p.in_game_name || p.name)
+  );
 
   return { players, auctionPlayers, captains, loading, error, refetch: fetchPlayers };
 }

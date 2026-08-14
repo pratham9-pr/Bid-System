@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { RoleBadge } from './RoleBadge';
 import { getTeamFullRoster, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
 import { appointTeamCaptain, removeTeamCaptain, removePlayerFromRoster, resetAllRostersAndCaptains, DEFAULT_TEAM_PURSE } from '../services/auctionService';
-import { getTeamLogo, getTeamDisplayName, TEAMS_CONFIG } from '../config/teamsConfig';
+import { getTeamLogo, getTeamDisplayName, getTeamOwner, TEAMS_CONFIG } from '../config/teamsConfig';
 
 // Team logo helper — uses central config so name/logo changes propagate everywhere
 const getTeamLogoUrl = (teamId) => getTeamLogo(teamId);
@@ -12,8 +12,12 @@ function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamNa
   const [showMenu, setShowMenu] = useState(false);
   const [loading, setLoading]   = useState(false);
 
-  const eligibleForCaptain = (allPlayers || []).filter(
-    (p) => !p.is_captain || p.sold_to_team_id === teamId
+  const eligibleForCaptain = Array.from(
+    new Map(
+      (allPlayers || [])
+        .filter((p) => !p.is_captain || p.sold_to_team_id === teamId || !p.sold_to_team_id)
+        .map((p) => [String(p.id), p])
+    ).values()
   );
 
   if (!player) {
@@ -43,27 +47,30 @@ function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamNa
                 const selectedPlayerId = e.target.value;
                 if (!selectedPlayerId) return;
                 setLoading(true);
-                await appointTeamCaptain(selectedPlayerId, teamId, teamName);
+                const res = await appointTeamCaptain(selectedPlayerId, teamId, teamName);
                 setLoading(false);
+                if (!res.success) {
+                  alert('Error appointing captain: ' + (res.error || 'Unknown error'));
+                }
                 onAppoint?.();
               }}
               disabled={loading}
-              className="appearance-none pl-2 pr-4 py-0.5 rounded text-[8px] font-rajdhani font-black uppercase tracking-widest
-                         bg-black/60 text-amber-300 border border-amber-500/40 hover:border-amber-400
-                         hover:bg-amber-500/20 transition-all cursor-pointer focus:outline-none"
+              className="appearance-none pl-2 pr-5 py-1 rounded text-[9px] font-rajdhani font-black uppercase tracking-widest
+                         bg-amber-500/15 text-amber-300 border border-amber-500/40 hover:border-amber-400
+                         hover:bg-amber-500/25 transition-all cursor-pointer focus:outline-none"
               title="Appoint a Captain for this team"
             >
               <option value="" disabled className="bg-surface-900 text-muted">
-                + Appoint
+                + APPOINT
               </option>
               {eligibleForCaptain.map((p) => (
                 <option key={p.id} value={p.id} className="bg-surface-900 text-white font-rajdhani font-bold">
-                  {p.in_game_name || p.name} (IGL)
+                  {p.in_game_name || p.name}
                 </option>
               ))}
             </select>
-            <div className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-amber-400">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-2 h-2">
+            <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-amber-400">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
                 <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </div>
@@ -107,39 +114,9 @@ function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamNa
             <span>👑</span>
             <span>CAPTAIN</span>
           </div>
-          
-          <div className="relative inline-flex items-center">
-            <select
-              value=""
-              onChange={async (e) => {
-                const selectedPlayerId = e.target.value;
-                if (!selectedPlayerId) return;
-                setLoading(true);
-                await appointTeamCaptain(selectedPlayerId, teamId, teamName);
-                setLoading(false);
-                onAppoint?.();
-              }}
-              disabled={loading}
-              className="appearance-none pl-2 pr-4 py-0.5 rounded text-[8px] font-rajdhani font-black uppercase tracking-widest
-                         bg-black/60 text-amber-300 border border-amber-500/40 hover:border-amber-400
-                         hover:bg-amber-500/20 transition-all cursor-pointer focus:outline-none"
-              title="Change or reassign this team's Captain"
-            >
-              <option value="" disabled className="bg-surface-900 text-muted">
-                ⚙ Change
-              </option>
-              {eligibleForCaptain.map((p) => (
-                <option key={p.id} value={p.id} className="bg-surface-900 text-white font-rajdhani font-bold">
-                  {p.in_game_name || p.name} (IGL)
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-amber-400">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-2 h-2">
-                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-          </div>
+          <span className="text-[8px] font-rajdhani font-black text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 uppercase tracking-widest">
+            🔒 LOCKED
+          </span>
         </div>
       ) : (
         <div className="w-full flex items-center justify-between mb-1 relative z-10">
@@ -237,7 +214,7 @@ function BalanceBar({ balance, starting = DEFAULT_TEAM_PURSE }) {
 // ─── Individual team card ─────────────────────────────────────────────────────
 function TeamRosterCard({ team, allPlayers, onAppoint }) {
   const teamId = team.id;
-  const { captain, auctionedPlayers, slots, totalCount, remainingSlots, isFull } = getTeamFullRoster(
+  const { captain, auctionedPlayers, slots, totalCount, remainingSlots, isFull, isPendingTeam } = getTeamFullRoster(
     teamId,
     allPlayers
   );
@@ -246,6 +223,34 @@ function TeamRosterCard({ team, allPlayers, onAppoint }) {
   const isBankrupt = (team.fire_coin_balance ?? 0) === 0;
   const isLow      = !isBankrupt && (team.fire_coin_balance ?? 0) < 500;
   const teamLogo   = getTeamLogoUrl(teamId);
+
+  if (isPendingTeam) {
+    return (
+      <div className="card-elevated p-6 opacity-60 border border-slate-700/50 bg-surface-900/40 relative overflow-hidden rounded-2xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl overflow-hidden bg-black/40 border border-white/5 p-1 flex-shrink-0 grayscale">
+              <img src={teamLogo} alt="" className="w-full h-full object-contain opacity-40" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-rajdhani font-black text-lg text-slate-400">
+                  {getTeamDisplayName(team.id, team.name || team.team_name)}
+                </h3>
+                <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[9px] font-rajdhani font-black uppercase tracking-wider">
+                  🔒 Locked / Pending
+                </span>
+              </div>
+              <p className="text-[10px] text-muted font-inter mt-0.5">
+                Franchise Pending · No captain or bidding required
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-rajdhani font-bold text-muted uppercase">Disabled</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -280,7 +285,7 @@ function TeamRosterCard({ team, allPlayers, onAppoint }) {
                 )}
               </div>
               <p className="text-[10px] text-muted font-inter mt-0.5">
-                Owner: <span className="text-slate-300 font-semibold">{team.owner || team.owner_name || 'Pending'}</span>
+                Owner: <span className="text-slate-300 font-semibold">{getTeamOwner(team.id, team.owner || team.owner_name)}</span>
               </p>
             </div>
           </div>

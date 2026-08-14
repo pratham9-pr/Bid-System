@@ -191,61 +191,7 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
 
         {/* ── Per-player action buttons ─────────────────────────────────── */}
         <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end items-center">
-          {/* 1. Appoint Captain Selector / Remove Captain */}
-          {isCaptain ? (
-            <button
-              id={`admin-remove-captain-${player.id}`}
-              onClick={() => run('removeCaptain', () => removeTeamCaptain(player.id))}
-              disabled={!!loading}
-              className="px-2.5 py-1.5 rounded-lg text-[10px] font-inter font-bold uppercase tracking-wider
-                         bg-amber-500/15 text-amber-300 border border-amber-500/40
-                         hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/40 transition-all cursor-pointer"
-              title="Remove captaincy from this player"
-            >
-              {isLoading('removeCaptain') ? '…' : '👑 Remove Captain'}
-            </button>
-          ) : (
-            <div className="relative inline-flex items-center">
-              <select
-                id={`admin-appoint-select-${player.id}`}
-                value=""
-                onChange={(e) => {
-                  const teamId = e.target.value;
-                  if (!teamId) return;
-                  const teamList = teams.length > 0 ? teams : TEAMS_CONFIG;
-                  const team = teamList.find((t) => t.id === teamId);
-                  const teamName = getTeamDisplayName(teamId, team?.team_name || team?.name);
-                  run('appoint', () => appointTeamCaptain(player.id, teamId, teamName));
-                }}
-                disabled={!!loading}
-                className="appearance-none pl-7 pr-6 py-1.5 rounded-lg text-[10px] font-rajdhani font-bold uppercase tracking-wider
-                           bg-amber-500/15 text-amber-300 border border-amber-500/40 hover:border-amber-400
-                           hover:bg-amber-500/25 transition-all cursor-pointer focus:outline-none focus:border-amber-400"
-                title="Appoint this player as a franchise Captain"
-              >
-                <option value="" disabled className="bg-surface-900 text-muted">
-                  Appoint Captain ▾
-                </option>
-                {(teams.length > 0 ? teams : TEAMS_CONFIG).map((t) => (
-                  <option key={t.id} value={t.id} className="bg-surface-900 text-white font-rajdhani font-bold">
-                    {getTeamDisplayName(t.id, t.team_name || t.name)}
-                  </option>
-                ))}
-              </select>
-              {/* Crown icon */}
-              <span className="pointer-events-none absolute left-2 text-[10px] text-amber-400">
-                👑
-              </span>
-              {/* Chevron */}
-              <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-amber-400">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3">
-                  <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-            </div>
-          )}
-
-          {/* 2. Set Active (Queue on stage without revealing) */}
+          {/* 1. Set Active (Queue on stage without revealing) */}
           {!isCaptain && (
             <button
               id={`admin-activate-${player.id}`}
@@ -320,11 +266,16 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
                 <option value="" disabled className="bg-surface-900 text-muted">
                   Sell ▾
                 </option>
-                {(teams.length > 0 ? teams : TEAMS_CONFIG).map((t) => (
-                  <option key={t.id} value={t.id} className="bg-surface-900 text-white font-rajdhani font-bold">
-                    {getTeamDisplayName(t.id, t.team_name || t.name)}
-                  </option>
-                ))}
+                {(teams.length > 0 ? teams : TEAMS_CONFIG)
+                  .filter((t) => {
+                    const clean = String(t.id).toLowerCase();
+                    return clean !== 'gamma_reapers' && clean !== 'delta_phantoms' && clean !== 'team_gamma' && clean !== 'team_delta';
+                  })
+                  .map((t) => (
+                    <option key={t.id} value={t.id} className="bg-surface-900 text-white font-rajdhani font-bold">
+                      {getTeamDisplayName(t.id, t.team_name || t.name)}
+                    </option>
+                  ))}
               </select>
               <span className="pointer-events-none absolute left-1.5 text-[10px]">🏷️</span>
               <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-gold-400">

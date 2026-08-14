@@ -391,10 +391,10 @@ BEGIN
     -- Seed Teams
     INSERT INTO public.teams (id, team_name, owner_name, owner_email, fire_coin_balance, last_bid_time)
     VALUES
-        ('TEAM_ALPHA', 'POWER HAWKS',  'Rahul', 'alpha@freefire.auction', 30000, NULL),
-        ('TEAM_BETA',  'TEAM VORTEX',  'Priya', 'beta@freefire.auction',  30000, NULL),
-        ('TEAM_GAMMA', 'PENDING',       'TBD',   'gamma@freefire.auction', 30000, NULL),
-        ('TEAM_DELTA', 'PENDING',       'TBD',   'delta@freefire.auction', 30000, NULL)
+        ('TEAM_ALPHA', 'POWER HAWKS',  'NX4 SILENT', 'alpha@freefire.auction', 30000, NULL),
+        ('TEAM_BETA',  'TEAM VORTEX',  'MOKSHII FF', 'beta@freefire.auction',  30000, NULL),
+        ('TEAM_GAMMA', 'PENDING',       'TBD',        'gamma@freefire.auction', 30000, NULL),
+        ('TEAM_DELTA', 'PENDING',       'TBD',        'delta@freefire.auction', 30000, NULL)
     ON CONFLICT (id) DO UPDATE
     SET team_name = EXCLUDED.team_name,
         owner_name = EXCLUDED.owner_name,
@@ -402,31 +402,46 @@ BEGIN
         fire_coin_balance = 30000,
         last_bid_time = NULL;
 
-    -- Seed Players
-    INSERT INTO public.players (id, in_game_name, base_price, max_limit, role, photo_url, current_bid, current_highest_bidder, current_highest_bidder_name, status)
+    -- Seed Players (Captains strictly pre-assigned; other players upcoming in bidding pool)
+    INSERT INTO public.players (id, in_game_name, name, base_price, max_limit, role, is_captain, current_bid, current_highest_bidder, current_highest_bidder_name, sold_to_team_id, sold_price, status)
     VALUES
-        ('P001', 'SK_Sabir',     5000, 20000, 'Rusher',    NULL, 5000, NULL, NULL, 'upcoming'),
-        ('P002', 'Jonty_Gaming', 4000, 15000, 'Sniper',    NULL, 4000, NULL, NULL, 'upcoming'),
-        ('P003', 'XoticBoy',     6000, 25000, 'IGL',       NULL, 6000, NULL, NULL, 'upcoming'),
-        ('P004', 'TotalGaming',  3000, 12000, 'Supporter', NULL, 3000, NULL, NULL, 'upcoming'),
-        ('P005', 'Gyan_Sujan',   7000, 28000, 'Rusher',    NULL, 7000, NULL, NULL, 'upcoming'),
-        ('P006', 'Sudip_Sarkar', 4500, 18000, 'Sniper',    NULL, 4500, NULL, NULL, 'upcoming'),
-        ('P007', 'Dyland_PROS',  8000, 30000, 'IGL',       NULL, 8000, NULL, NULL, 'upcoming'),
-        ('P008', 'Loud_Babi',    5500, 22000, 'Supporter', NULL, 5500, NULL, NULL, 'upcoming')
+        -- Permanent Captains
+        ('CAP_NX4_SILENT', 'NX4 SILENT', 'NX4 SILENT', 0, 30000, 'IGL', true, 0, 'alpha_wolves', 'POWER HAWKS', 'alpha_wolves', 0, 'sold'),
+        ('CAP_MOKSHII_FF', 'MOKSHII FF', 'MOKSHII FF', 0, 30000, 'IGL', true, 0, 'beta_strikers', 'TEAM VORTEX', 'beta_strikers', 0, 'sold'),
+
+        -- General Auction Pool Players
+        ('P001', 'SK_Sabir',     'SK Sabir',     5000, 20000, 'Rusher',    false, 5000, NULL, NULL, NULL, 0, 'upcoming'),
+        ('P002', 'Jonty_Gaming', 'Jonty Gaming', 4000, 15000, 'Sniper',    false, 4000, NULL, NULL, NULL, 0, 'upcoming'),
+        ('P003', 'XoticBoy',     'Xotic Boy',     6000, 25000, 'Rusher',    false, 6000, NULL, NULL, NULL, 0, 'upcoming'),
+        ('P004', 'TotalGaming',  'Total Gaming',  3000, 12000, 'Supporter', false, 3000, NULL, NULL, NULL, 0, 'upcoming'),
+        ('P005', 'Gyan_Sujan',   'Gyan Sujan',   7000, 28000, 'Rusher',    false, 7000, NULL, NULL, NULL, 0, 'upcoming'),
+        ('P006', 'Sudip_Sarkar', 'Sudip Sarkar', 4500, 18000, 'Sniper',    false, 4500, NULL, NULL, NULL, 0, 'upcoming'),
+        ('P007', 'Dyland_PROS',  'Dyland PROS',  8000, 30000, 'Supporter', false, 8000, NULL, NULL, NULL, 0, 'upcoming'),
+        ('P008', 'Loud_Babi',    'Loud Babi',    5500, 22000, 'Supporter', false, 5500, NULL, NULL, NULL, 0, 'upcoming'),
+        ('P009', 'Abhi_Gamer',   'ABHI GAMER',   5000, 20000, 'Rusher',    false, 5000, NULL, NULL, NULL, 0, 'upcoming')
     ON CONFLICT (id) DO UPDATE
     SET in_game_name = EXCLUDED.in_game_name,
+        name = EXCLUDED.name,
         base_price = EXCLUDED.base_price,
         max_limit = EXCLUDED.max_limit,
         role = EXCLUDED.role,
-        current_bid = EXCLUDED.base_price,
-        current_highest_bidder = NULL,
-        current_highest_bidder_name = NULL,
-        status = 'upcoming';
+        is_captain = EXCLUDED.is_captain,
+        current_bid = EXCLUDED.current_bid,
+        current_highest_bidder = EXCLUDED.current_highest_bidder,
+        current_highest_bidder_name = EXCLUDED.current_highest_bidder_name,
+        sold_to_team_id = EXCLUDED.sold_to_team_id,
+        sold_price = EXCLUDED.sold_price,
+        status = EXCLUDED.status;
 
     -- Reset Auction State
     UPDATE public.auction_state
     SET active_player_id = NULL,
         auction_paused = false,
+        is_revealed = false,
+        bidding_open = false,
+        status = 'idle',
+        current_bid = 0,
+        highest_bidder_team_id = NULL,
         updated_at = NOW()
     WHERE id = 'current';
 

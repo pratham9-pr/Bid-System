@@ -1,5 +1,5 @@
 import React from 'react';
-import { getTeamDisplayName } from '../config/teamsConfig';
+import { getTeamDisplayName, getTeamOwner } from '../config/teamsConfig';
 
 const medals = ['🥇', '🥈', '🥉'];
 
@@ -47,7 +47,7 @@ export function TeamLeaderboard({ teams }) {
                   />
                 </div>
                 <div className="flex justify-between mt-1">
-                  <span className="text-[10px] text-muted font-inter">{team.owner_name}</span>
+                  <span className="text-[10px] text-muted font-inter">Owner: {getTeamOwner(team.id, team.owner_name || team.owner)}</span>
                   <span className="text-[10px] text-muted font-inter">{team.id}</span>
                 </div>
               </div>

@@ -214,6 +214,28 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
   const [isLoading, setIsLoading] = useState(false);
   const { players } = useAllPlayers();
 
+  const cleanTeamId = String(team?.id || '').toLowerCase().trim();
+  const isPendingTeam =
+    cleanTeamId.includes('gamma') ||
+    cleanTeamId.includes('delta') ||
+    team?.isPending === true;
+
+  if (isPendingTeam) {
+    return (
+      <div className="card-elevated p-8 text-center bg-surface-900/60 border border-slate-700/40 rounded-2xl">
+        <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 mx-auto flex items-center justify-center text-xl mb-3 shadow-inner">
+          🔒
+        </div>
+        <h3 className="font-rajdhani font-black text-lg text-white uppercase tracking-wider">
+          Franchise Inactive / Pending
+        </h3>
+        <p className="text-xs text-slate-400 font-inter mt-1.5 max-w-xs mx-auto leading-relaxed">
+          The auction floor is exclusively live between <span className="text-amber-400 font-bold">POWER HAWKS</span> and <span className="text-sky-400 font-bold">TEAM VORTEX</span>. Bidding controls are disabled for this account.
+        </p>
+      </div>
+    );
+  }
+
   const teamBalance    = team?.fire_coin_balance ?? 0;
   const currentBid     = activePlayer?.current_bid ?? 0;
 
@@ -222,7 +244,8 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
   // Count sold (non-captain) players drafted into this team
   const draftedPlayers  = (players || []).filter(
     (p) => p.status === 'sold' && !p.is_captain &&
-           (p.sold_to_team_id === team?.id || p.current_highest_bidder === team?.id)
+           (p.sold_to_team_id === team?.id || p.current_highest_bidder === team?.id) &&
+           (p.sold_price > 0 || p.current_bid > 0) && p.role !== 'IGL'
   );
   const remainingSlots  = Math.max(0, MAX_AUCTION_SLOTS - draftedPlayers.length);
 
