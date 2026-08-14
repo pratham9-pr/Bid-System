@@ -15,8 +15,8 @@ export function MyBalanceWidget({ team }) {
   const { players } = useAllPlayers();
   if (!team) return null;
 
-  const { captain, auctionedPlayers, totalCount, remainingSlots, isFull } = getTeamFullRoster(
-    team.id,
+  const { captain, auctionedPlayers, slots = [null, null, null, null], totalCount, remainingSlots, isFull } = getTeamFullRoster(
+    team?.id,
     players
   );
 

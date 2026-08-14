@@ -96,13 +96,13 @@ export default function AuctionRoom() {
             📺 Stream Overlay
           </button>
           <span className="font-rajdhani font-semibold text-sm text-slate-300 hidden sm:block">
-            {getTeamDisplayName(displayTeam.id, displayTeam.team_name)}
+            {getTeamDisplayName(displayTeam?.id, displayTeam?.team_name || displayTeam?.name)}
           </span>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg
                           bg-surface-700 border border-surface-500/50">
             <span className="text-gold-400 font-rajdhani font-bold text-sm">₣</span>
             <span className="font-rajdhani font-bold text-sm text-white tabular-nums">
-              {(displayTeam.fire_coin_balance ?? 0).toLocaleString()}
+              {(displayTeam?.fire_coin_balance ?? 0).toLocaleString()}
             </span>
           </div>
           <button

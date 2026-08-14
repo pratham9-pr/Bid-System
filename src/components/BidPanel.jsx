@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { placeBid, MAX_BID_LIMIT, MIN_BASE_PRICE, computeMaxAllowedBid } from '../services/auctionService';
 import { useAllPlayers } from '../hooks/useAllPlayers';
-import { isTeamRosterFull, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
+import { getTeamFullRoster, isTeamRosterFull, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
 
 // ─── SVG Ring Constants ──────────────────────────────────────────────────────
 const RING_SIZE       = 72;   // px — total SVG canvas size
@@ -213,30 +213,13 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
   const [bidAmount, setBidAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { players } = useAllPlayers();
-
-  const isPendingTeam = team?.isPending === true;
-
-  if (isPendingTeam) {
-    return (
-      <div className="card-elevated p-8 text-center bg-surface-900/60 border border-slate-700/40 rounded-2xl">
-        <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 mx-auto flex items-center justify-center text-xl mb-3 shadow-inner">
-          🔒
-        </div>
-        <h3 className="font-rajdhani font-black text-lg text-white uppercase tracking-wider">
-          Franchise Inactive / Pending
-        </h3>
-        <p className="text-xs text-slate-400 font-inter mt-1.5 max-w-xs mx-auto leading-relaxed">
-          This franchise is currently inactive. Bidding controls are disabled for this account.
-        </p>
-      </div>
-    );
-  }
+  const isSubmittingRef = useRef(false);
 
   const teamBalance    = team?.fire_coin_balance ?? 0;
   const currentBid     = activePlayer?.current_bid ?? 0;
 
   // ── Roster state ────────────────────────────────────────────────────────────
-  const { slots, totalCount, remainingSlots, isFull: isRosterFull, captain } = getTeamFullRoster(team?.id, players);
+  const { totalCount, remainingSlots, isFull: isRosterFull, captain } = getTeamFullRoster(team?.id, players);
 
   // ── Dynamic max bid (anti-soft-lock formula) ────────────────────────────────
   const dynamicMaxBid   = computeMaxAllowedBid(teamBalance, remainingSlots);
@@ -253,12 +236,13 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
   // ── Sync bid amount when player changes ─────────────────────────────────────
   useEffect(() => {
     if (activePlayer) {
-      const nextSuggested = Math.min(effectiveMax, activePlayer.current_bid + 500);
-      setBidAmount(String(Math.max(activePlayer.current_bid + 1, nextSuggested)));
+      const curBid = Number(activePlayer.current_bid ?? activePlayer.base_price ?? 0);
+      const nextSuggested = Math.min(effectiveMax, curBid + 500);
+      setBidAmount(String(Math.max(curBid + 1, nextSuggested)));
     } else {
       setBidAmount('');
     }
-  }, [activePlayer?.id, activePlayer?.current_bid, effectiveMax]);
+  }, [activePlayer, activePlayer?.id, activePlayer?.current_bid, activePlayer?.base_price, effectiveMax]);
 
   const adjustBid = (delta) => {
     setBidAmount((prev) => {
@@ -267,8 +251,6 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
       return String(updated);
     });
   };
-
-  const isSubmittingRef = useRef(false);
 
   const handleBid = useCallback(async () => {
     if (isSubmittingRef.current || isLoading) return;
@@ -289,17 +271,17 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
       onNotify?.({ type: 'error', message: 'Enter a valid bid amount.' });
       return;
     }
-    if (amount <= activePlayer.current_bid && activePlayer.current_highest_bidder) {
+    if (amount <= Number(activePlayer.current_bid ?? 0) && activePlayer.current_highest_bidder) {
       onNotify?.({
         type: 'error',
-        message: `Bid must exceed current bid of ₣${activePlayer.current_bid.toLocaleString()}`,
+        message: `Bid must exceed current bid of ₣${Number(activePlayer.current_bid ?? 0).toLocaleString()}`,
       });
       return;
     }
-    if (amount < activePlayer.base_price) {
+    if (amount < Number(activePlayer.base_price ?? 0)) {
       onNotify?.({
         type: 'error',
-        message: `Bid cannot be lower than base price of ₣${activePlayer.base_price.toLocaleString()}`,
+        message: `Bid cannot be lower than base price of ₣${Number(activePlayer.base_price ?? 0).toLocaleString()}`,
       });
       return;
     }
@@ -340,6 +322,24 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
       isSubmittingRef.current = false;
     }
   }, [bidAmount, activePlayer, team, teamBalance, effectiveMax, isRosterFull, onNotify, captain, isLoading, isSold, biddingOpen, auctionPaused, isFloorLocked]);
+
+  const isPendingTeam = team?.isPending === true;
+
+  if (isPendingTeam) {
+    return (
+      <div className="card-elevated p-8 text-center bg-surface-900/60 border border-slate-700/40 rounded-2xl">
+        <div className="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 mx-auto flex items-center justify-center text-xl mb-3 shadow-inner">
+          🔒
+        </div>
+        <h3 className="font-rajdhani font-black text-lg text-white uppercase tracking-wider">
+          Franchise Inactive / Pending
+        </h3>
+        <p className="text-xs text-slate-400 font-inter mt-1.5 max-w-xs mx-auto leading-relaxed">
+          This franchise is currently inactive. Bidding controls are disabled for this account.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="card-elevated p-5 flex flex-col gap-4">
@@ -517,7 +517,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
             onChange={(e) => setBidAmount(e.target.value)}
             disabled={isDisabled || isSold}
             placeholder="Enter amount"
-            min={activePlayer ? activePlayer.current_bid + 1 : 0}
+            min={activePlayer ? Number(activePlayer.current_bid ?? 0) + 1 : 0}
             max={effectiveMax}
             className="input-field pl-9 text-xl font-rajdhani font-bold pr-3
                        disabled:opacity-40 disabled:cursor-not-allowed"
@@ -538,7 +538,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
       {!isSold && activePlayer && (
         <div className="grid grid-cols-3 gap-2">
           {[1000, 2500, 5000].map((preset) => {
-            const amount = Math.min(effectiveMax, activePlayer.current_bid + preset);
+            const amount = Math.min(effectiveMax, Number(activePlayer.current_bid ?? activePlayer.base_price ?? 0) + preset);
             const isOverMax = amount > effectiveMax || amount > teamBalance;
             return (
               <button
@@ -570,7 +570,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
               : isFloorLocked
                 ? 'Bidding floor is locked — the host will open bids momentarily.'
                 : activePlayer && biddingOpen
-                  ? `Min bid: ₣${(activePlayer.current_bid + 1).toLocaleString()} · Your max: ₣${effectiveMax.toLocaleString()} FC`
+                  ? `Min bid: ₣${(Number(activePlayer.current_bid ?? 0) + 1).toLocaleString()} · Your max: ₣${effectiveMax.toLocaleString()} FC`
                   : 'Waiting for the auctioneer to start…'}
       </p>
 

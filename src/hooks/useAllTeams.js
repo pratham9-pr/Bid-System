@@ -50,15 +50,6 @@ export function useAllTeams() {
       });
 
       setTeams(normalized);
-
-      // Auto-correct any database discrepancies to 40k minus spent
-      for (const t of normalized) {
-        if (t.fire_coin_balance !== 40000 && (!playersData || playersData.length === 0)) {
-          supabase.from('teams').update({ fire_coin_balance: 40000 }).eq('id', t.id).then(() => {});
-        } else {
-          supabase.from('teams').update({ fire_coin_balance: t.fire_coin_balance }).eq('id', t.id).then(() => {});
-        }
-      }
     } catch (err) {
       setError(err.message);
     } finally {
