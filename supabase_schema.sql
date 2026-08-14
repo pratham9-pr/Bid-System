@@ -428,7 +428,7 @@ BEGIN
         ('TEAM_ALPHA', 'POWER HAWKS',  'NX4 SILENT', 'alpha@freefire.auction', 40000, NULL),
         ('TEAM_BETA',  'TEAM VORTEX',  'MOKSHII FF', 'beta@freefire.auction',  40000, NULL),
         ('TEAM_GAMMA', 'Abyssal Ebon', 'invincible', 'gamma@freefire.auction', 40000, NULL),
-        ('TEAM_DELTA', 'RX KUDLA',     'TBD',        'delta@freefire.auction', 40000, NULL)
+        ('TEAM_DELTA', 'RX KUDLA',     'RX KAUSHII', 'delta@freefire.auction', 40000, NULL)
     ON CONFLICT (id) DO UPDATE
     SET team_name = EXCLUDED.team_name,
         owner_name = EXCLUDED.owner_name,
@@ -440,9 +440,10 @@ BEGIN
     INSERT INTO public.players (id, in_game_name, name, base_price, max_limit, role, is_captain, current_bid, current_highest_bidder, current_highest_bidder_name, sold_to_team_id, sold_price, status)
     VALUES
         -- Permanent Captains
-        ('CAP_NX4_SILENT', 'NX4 SILENT', 'NX4 SILENT', 0, 40000, 'IGL', true, 0, 'alpha_wolves', 'POWER HAWKS', 'alpha_wolves', 0, 'sold'),
-        ('CAP_MOKSHII_FF', 'MOKSHII FF', 'MOKSHII FF', 0, 40000, 'IGL', true, 0, 'beta_strikers', 'TEAM VORTEX', 'beta_strikers', 0, 'sold'),
-        ('CAP_INVINCIBLE', 'invincible', 'invincible', 0, 40000, 'IGL', true, 0, 'gamma_reapers', 'Abyssal Ebon', 'gamma_reapers', 0, 'sold'),
+        ('CAP_NX4_SILENT',  'NX4 SILENT',  'NX4 SILENT',  0, 40000, 'IGL', true, 0, 'alpha_wolves',  'POWER HAWKS',  'alpha_wolves',  0, 'sold'),
+        ('CAP_MOKSHII_FF',  'MOKSHII FF',  'MOKSHII FF',  0, 40000, 'IGL', true, 0, 'beta_strikers',  'TEAM VORTEX',  'beta_strikers',  0, 'sold'),
+        ('CAP_INVINCIBLE',  'invincible',  'invincible',  0, 40000, 'IGL', true, 0, 'gamma_reapers', 'Abyssal Ebon', 'gamma_reapers', 0, 'sold'),
+        ('CAP_RX_KAUSHII',  'RX KAUSHII',  'RX KAUSHII',  0, 40000, 'IGL', true, 0, 'delta_phantoms', 'RX KUDLA',     'delta_phantoms', 0, 'sold'),
 
         -- General Auction Pool Players
         ('P001', 'SK_Sabir',     'SK Sabir',     5000, 20000, 'Rusher',    false, 5000, NULL, NULL, NULL, 0, 'upcoming'),

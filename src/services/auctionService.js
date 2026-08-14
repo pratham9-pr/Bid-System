@@ -721,6 +721,7 @@ export async function resetAllRostersAndCaptains() {
         const isNx4 = pName.includes('nx4') || pName.includes('silent') || p.id === 'CAP_NX4_SILENT';
         const isMokshii = pName.includes('mokshii') || p.id === 'CAP_MOKSHII_FF';
         const isInvincible = pName.includes('invincible') || p.id === 'CAP_INVINCIBLE';
+        const isRxKaushii = pName.includes('kaushii') || p.id === 'CAP_RX_KAUSHII';
 
         if (isNx4) {
           // Lock NX4 SILENT as Permanent Captain for POWER HAWKS
@@ -755,6 +756,18 @@ export async function resetAllRostersAndCaptains() {
             sold_to_team_id:             'gamma_reapers',
             current_highest_bidder:      'gamma_reapers',
             current_highest_bidder_name: 'Abyssal Ebon',
+            sold_price:                  0,
+            current_bid:                 0,
+          });
+        } else if (isRxKaushii) {
+          // Lock RX KAUSHII as Permanent Captain for RX KUDLA
+          await safeUpdatePlayer(p.id, {
+            status:                      'sold',
+            is_captain:                  true,
+            role:                        'IGL',
+            sold_to_team_id:             'delta_phantoms',
+            current_highest_bidder:      'delta_phantoms',
+            current_highest_bidder_name: 'RX KUDLA',
             sold_price:                  0,
             current_bid:                 0,
           });
@@ -797,7 +810,7 @@ export async function resetAllRostersAndCaptains() {
 
     await supabase.from('teams').update({
       team_name:         'RX KUDLA',
-      owner_name:        'TBD',
+      owner_name:        'RX KAUSHII',
       fire_coin_balance: DEFAULT_TEAM_PURSE,
       last_bid_time:     null,
     }).or('id.eq.delta_phantoms,id.eq.TEAM_DELTA');

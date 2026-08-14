@@ -40,7 +40,7 @@ export const TEAMS_CONFIG = [
     id: 'delta_phantoms',
     aliases: ['delta_phantoms', 'team_delta', 'delta', '4', 'delta phantoms', 'rx kudla', 'rx_kudla', 'rx', 'kudla'],
     name: 'RX KUDLA',
-    owner: 'TBD',
+    owner: 'RX KAUSHII',
     shortName: 'RXK',
     logo: '/delta-phantoms.png',
     color: 'border-purple-500/40 text-purple-400 bg-purple-500/10 hover:border-purple-500/80 hover:bg-purple-500/20 shadow-[0_0_20px_rgba(168,85,247,0.15)]',
@@ -68,9 +68,20 @@ export function getTeamDisplayName(teamId, dbName = null) {
 /** Returns owner name for a team ID with fallback */
 export function getTeamOwner(teamId, dbOwner = null) {
   const cleanId = String(teamId || '').toLowerCase().trim();
+  const cleanDb = String(dbOwner || '').toLowerCase().trim();
+
   const config = TEAMS_CONFIG.find(
-    (t) => t.id === cleanId || t.aliases?.includes(cleanId)
+    (t) =>
+      t.id === cleanId ||
+      t.aliases?.includes(cleanId) ||
+      cleanId.includes(t.id) ||
+      (t.name && cleanId.includes(t.name.toLowerCase()))
   );
+
+  // If dbOwner is stale ('tbd', 'pending', empty), prioritize the central config owner
+  if (config?.owner && (!dbOwner || cleanDb === 'tbd' || cleanDb === 'pending' || cleanDb === '')) {
+    return config.owner;
+  }
 
   return config?.owner || dbOwner || 'Pending';
 }

@@ -60,7 +60,23 @@ export const PERMANENT_CAPTAINS = {
     team_name: 'Abyssal Ebon',
     title: 'Abyssal Ebon Captain (IGL)',
   },
-  delta_phantoms: null, // RX KUDLA (no permanent captain hardcoded yet)
+  delta_phantoms: {
+    id: 'CAP_RX_KAUSHII',
+    name: 'RX KAUSHII',
+    in_game_name: 'RX KAUSHII',
+    role: 'IGL',
+    photo_url: '/players/default.jpg',
+    custom_card_url: null,
+    image_url: null,
+    is_captain: true,
+    is_locked: true,
+    status: 'captain',
+    current_bid: 0,
+    sold_price: 0,
+    team_id: 'delta_phantoms',
+    team_name: 'RX KUDLA',
+    title: 'RX KUDLA Captain (IGL)',
+  },
 };
 
 export const FRANCHISE_CAPTAINS = PERMANENT_CAPTAINS;
@@ -74,39 +90,41 @@ export function getCaptainForTeam(teamId) {
   const cleanId = String(teamId).toLowerCase().trim();
 
   if (
-    cleanId === 'alpha_wolves' ||
-    cleanId === 'team_alpha' ||
-    cleanId === 'power_hawks' ||
-    cleanId === 'power hawks' ||
-    cleanId === 'alpha' ||
+    cleanId.includes('alpha') ||
+    cleanId.includes('power') ||
+    cleanId.includes('hawks') ||
     cleanId === '1'
   ) {
     return PERMANENT_CAPTAINS.alpha_wolves;
   }
 
   if (
-    cleanId === 'beta_strikers' ||
-    cleanId === 'team_beta' ||
-    cleanId === 'team_vortex' ||
-    cleanId === 'team vortex' ||
-    cleanId === 'beta' ||
-    cleanId === 'vortex' ||
+    cleanId.includes('beta') ||
+    cleanId.includes('vortex') ||
+    cleanId.includes('strikers') ||
     cleanId === '2'
   ) {
     return PERMANENT_CAPTAINS.beta_strikers;
   }
 
   if (
-    cleanId === 'gamma_reapers' ||
-    cleanId === 'team_gamma' ||
-    cleanId === 'abyssal_ebon' ||
-    cleanId === 'abyssal ebon' ||
-    cleanId === 'abyssal' ||
-    cleanId === 'ebon' ||
-    cleanId === 'gamma' ||
+    cleanId.includes('gamma') ||
+    cleanId.includes('abyssal') ||
+    cleanId.includes('ebon') ||
+    cleanId.includes('reapers') ||
     cleanId === '3'
   ) {
     return PERMANENT_CAPTAINS.gamma_reapers;
+  }
+
+  if (
+    cleanId.includes('delta') ||
+    cleanId.includes('kudla') ||
+    cleanId.includes('rx') ||
+    cleanId.includes('phantoms') ||
+    cleanId === '4'
+  ) {
+    return PERMANENT_CAPTAINS.delta_phantoms;
   }
 
   return null;
@@ -119,12 +137,14 @@ export function isPermanentCaptainName(name) {
   if (!name) return false;
   const clean = String(name).toLowerCase().trim();
   return (
-    clean === 'nx4 silent' ||
-    clean === 'nx4' ||
-    clean === 'silent' ||
-    clean === 'mokshii ff' ||
-    clean === 'mokshii' ||
-    clean === 'invincible'
+    clean.includes('nx4') ||
+    clean.includes('silent') ||
+    clean.includes('mokshii') ||
+    clean.includes('invincible') ||
+    clean.includes('kaushii') ||
+    clean.includes('kaushi') ||
+    clean.includes('rx kaushi') ||
+    clean.includes('rx kaushii')
   );
 }
 
@@ -167,7 +187,14 @@ export function getTeamFullRoster(teamId, allPlayers = []) {
     const dbMatch = uniquePlayers.find((p) => {
       const pName = (p.in_game_name || p.name || '').toLowerCase().trim();
       const capName = baseCaptain.name.toLowerCase().trim();
-      return pName === capName || p.id === baseCaptain.id;
+      const capInGame = (baseCaptain.in_game_name || '').toLowerCase().trim();
+      return (
+        pName === capName ||
+        pName === capInGame ||
+        (capName.includes('kaush') && pName.includes('kaush')) ||
+        p.id === baseCaptain.id ||
+        (p.is_captain && (String(p.sold_to_team_id).toLowerCase() === cleanTeamId || String(p.current_highest_bidder).toLowerCase() === cleanTeamId))
+      );
     });
 
     captain = {
@@ -185,6 +212,23 @@ export function getTeamFullRoster(teamId, allPlayers = []) {
       role: 'IGL',
       status: 'captain',
     };
+  } else {
+    // Fallback: look in database players for an appointed captain for this team
+    const dbCaptain = uniquePlayers.find(
+      (p) =>
+        (p.is_captain === true || isPermanentCaptainName(p.in_game_name || p.name)) &&
+        (String(p.sold_to_team_id || '').toLowerCase() === cleanTeamId ||
+          String(p.current_highest_bidder || '').toLowerCase() === cleanTeamId)
+    );
+    if (dbCaptain) {
+      captain = {
+        ...dbCaptain,
+        is_captain: true,
+        is_locked: true,
+        role: 'IGL',
+        status: 'captain',
+      };
+    }
   }
 
   const captainId = captain?.id ? String(captain.id) : null;
