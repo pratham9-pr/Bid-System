@@ -8,6 +8,7 @@ import { BidPanel }           from '../components/BidPanel';
 import { MyBalanceWidget }    from '../components/MyBalanceWidget';
 import { PlayersQueue }       from '../components/PlayersQueue';
 import { CompetitorSidebar }  from '../components/CompetitorSidebar';
+import { getTeamDisplayName } from '../config/teamsConfig';
 import { Notification }       from '../components/Notification';
 
 export default function AuctionRoom() {
@@ -84,7 +85,7 @@ export default function AuctionRoom() {
             📺 Stream Overlay
           </button>
           <span className="font-rajdhani font-semibold text-sm text-slate-300 hidden sm:block">
-            {displayTeam.team_name}
+            {getTeamDisplayName(displayTeam.id, displayTeam.team_name)}
           </span>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg
                           bg-surface-700 border border-surface-500/50">

@@ -8,6 +8,7 @@ import { PlayerControlCard } from '../components/PlayerControlCard';
 import { TeamLeaderboard } from '../components/TeamLeaderboard';
 import { AddPlayerForm } from '../components/AddPlayerForm';
 import { TeamRosters } from '../components/TeamRosters';
+import { getTeamDisplayName, TEAMS_CONFIG } from '../config/teamsConfig';
 import { seedDatabase, revealPlayer, hidePlayer, startBidding, closeBidding, manualSellToTeam } from '../services/auctionService';
 
 export default function AdminPanel() {
@@ -208,7 +209,7 @@ export default function AdminPanel() {
                       id="admin-reveal-stage-btn"
                       onClick={async () => {
                         setRevealing(true);
-                        await revealPlayer();
+                        await revealPlayer(activePlayer?.id);
                         setRevealing(false);
                       }}
                       disabled={revealing}
@@ -332,9 +333,9 @@ export default function AdminPanel() {
                       <option value="" disabled className="bg-surface-900 text-muted">
                         — Select a Franchise Team —
                       </option>
-                      {teams.map((t) => (
+                      {(teams.length > 0 ? teams : TEAMS_CONFIG).map((t) => (
                         <option key={t.id} value={t.id} className="bg-surface-900 text-white">
-                          {t.team_name || t.name}
+                          {getTeamDisplayName(t.id, t.team_name || t.name)}
                         </option>
                       ))}
                     </select>
@@ -359,7 +360,7 @@ export default function AdminPanel() {
                       const result = await manualSellToTeam(
                         activePlayer.id,
                         sellTeamId,
-                        selectedTeam.team_name || selectedTeam.name,
+                        getTeamDisplayName(selectedTeam.id, selectedTeam.team_name || selectedTeam.name),
                         activePlayer.current_bid || activePlayer.base_price || 0,
                       );
                       setSelling(false);

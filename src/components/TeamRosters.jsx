@@ -2,17 +2,11 @@ import React, { useState } from 'react';
 import { RoleBadge } from './RoleBadge';
 import { getTeamFullRoster, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
 import { appointTeamCaptain, removeTeamCaptain } from '../services/auctionService';
+import { getTeamLogo, getTeamDisplayName, TEAMS_CONFIG } from '../config/teamsConfig';
+import { DEFAULT_TEAM_PURSE } from '../services/auctionService';
 
-// Team logo helper
-const getTeamLogo = (teamId) => {
-  const map = {
-    alpha_wolves: '/alpha-wolves.png',
-    beta_strikers: '/beta-strikers.png',
-    gamma_reapers: '/gamma-reapers.png',
-    delta_phantoms: '/delta-phantoms.png',
-  };
-  return map[teamId] || '/logo.png';
-};
+// Team logo helper — uses central config so name/logo changes propagate everywhere
+const getTeamLogoUrl = (teamId) => getTeamLogo(teamId);
 
 // ─── Player thumbnail inside a roster card ────────────────────────────────────
 function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamName, allPlayers = [], onAppoint }) {
@@ -157,8 +151,8 @@ function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamNa
   );
 }
 
-// ─── Balance bar — proportion of starting budget spent ───────────────────────
-function BalanceBar({ balance, starting = 50000 }) {
+// ─── Balance bar — proportion of starting budget remaining ────────────────────────────
+function BalanceBar({ balance, starting = DEFAULT_TEAM_PURSE }) {
   const pct = Math.min(100, (balance / starting) * 100);
   return (
     <div className="h-1 bg-surface-600 rounded-full overflow-hidden mt-1">
@@ -184,7 +178,7 @@ function TeamRosterCard({ team, allPlayers, onAppoint }) {
   const totalSpent = auctionedPlayers.reduce((sum, p) => sum + (p.current_bid ?? p.sold_price ?? 0), 0);
   const isBankrupt = (team.fire_coin_balance ?? 0) === 0;
   const isLow      = !isBankrupt && (team.fire_coin_balance ?? 0) < 500;
-  const teamLogo   = getTeamLogo(teamId);
+  const teamLogo   = getTeamLogoUrl(teamId);
 
   return (
     <div
@@ -210,7 +204,7 @@ function TeamRosterCard({ team, allPlayers, onAppoint }) {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-rajdhani font-black text-lg text-white leading-tight truncate">
-                  {team.name || team.team_name}
+                  {getTeamDisplayName(team.id, team.name || team.team_name)}
                 </h3>
                 {isFull && (
                   <span className="px-2 py-0.5 rounded bg-gold-500/20 text-gold-400 border border-gold-500/40 text-[9px] font-rajdhani font-black uppercase tracking-wider">

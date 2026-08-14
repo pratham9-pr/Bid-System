@@ -25,10 +25,11 @@ export function useAuctionRoom(teamId) {
       setActivePlayer(null);
       return;
     }
+    const cleanId = String(id);
     const { data, error } = await supabase
       .from('players')
       .select('*')
-      .eq('id', id)
+      .eq('id', cleanId)
       .maybeSingle();
 
     if (!error && data && !data.is_captain) {
@@ -45,7 +46,7 @@ export function useAuctionRoom(teamId) {
     const { data } = await supabase
       .from('teams')
       .select('*')
-      .eq('id', id)
+      .eq('id', String(id))
       .maybeSingle();
 
     if (data) setTeam(data);
@@ -57,22 +58,45 @@ export function useAuctionRoom(teamId) {
 
     async function syncState() {
       try {
-        const { data: stateData } = await supabase
+        const { data: stateRows } = await supabase
           .from('auction_state')
           .select('*')
-          .eq('id', 1)
-          .maybeSingle();
+          .limit(1);
+
+        const stateData = stateRows && stateRows[0];
 
         if (isMounted && stateData) {
           setAuctionState(stateData);
           setActivePlayerId(stateData.active_player_id || null);
-          setIsRevealed(stateData.is_revealed === true);
-          setBiddingOpen(stateData.bidding_open === true);
+          const revealed = Boolean(
+            stateData.is_revealed === true ||
+            stateData.status === 'revealed' ||
+            stateData.status === 'bidding' ||
+            stateData.status === 'sold'
+          );
+          const bidding = Boolean(
+            stateData.bidding_open === true ||
+            stateData.status === 'bidding'
+          );
+          setIsRevealed(revealed);
+          setBiddingOpen(bidding);
           setAuctionPaused(stateData.status === 'paused' || stateData.auction_paused === true);
+
           if (stateData.active_player_id) {
             await fetchPlayer(stateData.active_player_id);
           } else {
-            setActivePlayer(null);
+            // Also check if any non-captain player is marked active
+            const { data: activePlayers } = await supabase
+              .from('players')
+              .select('*')
+              .eq('status', 'active')
+              .limit(1);
+            if (activePlayers && activePlayers[0] && !activePlayers[0].is_captain) {
+              setActivePlayer(activePlayers[0]);
+              setActivePlayerId(activePlayers[0].id);
+            } else {
+              setActivePlayer(null);
+            }
           }
         }
       } catch (e) {
@@ -103,13 +127,23 @@ export function useAuctionRoom(teamId) {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'auction_state' },
         (payload) => {
-          console.log('Real-time update received:', payload.new);
+          console.log('Real-time auction_state update received:', payload.new);
           const newState = payload.new;
-          if (newState) {
+          if (newState && isMounted) {
             setAuctionState(newState);
             setActivePlayerId(newState.active_player_id || null);
-            setIsRevealed(newState.is_revealed === true);
-            setBiddingOpen(newState.bidding_open === true);
+            const revealed = Boolean(
+              newState.is_revealed === true ||
+              newState.status === 'revealed' ||
+              newState.status === 'bidding' ||
+              newState.status === 'sold'
+            );
+            const bidding = Boolean(
+              newState.bidding_open === true ||
+              newState.status === 'bidding'
+            );
+            setIsRevealed(revealed);
+            setBiddingOpen(bidding);
             setAuctionPaused(newState.status === 'paused' || newState.auction_paused === true);
             if (newState.active_player_id) {
               fetchPlayer(newState.active_player_id);
@@ -125,10 +159,14 @@ export function useAuctionRoom(teamId) {
         { event: '*', schema: 'public', table: 'players' },
         (payload) => {
           const newPlayer = payload.new;
-          if (newPlayer && newPlayer.id === activePlayerId) {
-            setActivePlayer(newPlayer);
-          } else if (newPlayer && newPlayer.status === 'active') {
-            setActivePlayer(newPlayer);
+          if (newPlayer && isMounted) {
+            if (newPlayer.status === 'active' || newPlayer.id === activePlayerId) {
+              if (!newPlayer.is_captain) {
+                setActivePlayer(newPlayer);
+              } else {
+                setActivePlayer(null);
+              }
+            }
           }
         }
       )
@@ -138,7 +176,7 @@ export function useAuctionRoom(teamId) {
         { event: '*', schema: 'public', table: 'teams' },
         (payload) => {
           const updatedTeam = payload.new;
-          if (updatedTeam && updatedTeam.id === teamId) {
+          if (updatedTeam && isMounted && String(updatedTeam.id) === String(teamId)) {
             setTeam(updatedTeam);
           }
         }
@@ -149,7 +187,7 @@ export function useAuctionRoom(teamId) {
 
     // 3. Fallback polling every 1.5s to ensure 100% sync even if tab sleeps
     const pollInterval = setInterval(() => {
-      syncState();
+      if (isMounted) syncState();
     }, 1500);
 
     return () => {
@@ -157,7 +195,7 @@ export function useAuctionRoom(teamId) {
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
-  }, [teamId, activePlayerId]);
+  }, [teamId]);
 
   return {
     auctionState,

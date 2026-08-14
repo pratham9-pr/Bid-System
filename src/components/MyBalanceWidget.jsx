@@ -1,6 +1,8 @@
 import React from 'react';
 import { useAllPlayers } from '../hooks/useAllPlayers';
 import { getTeamFullRoster, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
+import { computeMaxAllowedBid, DEFAULT_TEAM_PURSE, MIN_BASE_PRICE } from '../services/auctionService';
+import { getTeamDisplayName } from '../config/teamsConfig';
 
 // Flame icon SVG
 const FlameIcon = () => (
@@ -17,6 +19,15 @@ export function MyBalanceWidget({ team }) {
     team.id,
     players
   );
+
+  const teamBalance  = team.fire_coin_balance ?? 0;
+  const maxAllowedBid = computeMaxAllowedBid(teamBalance, remainingSlots);
+  const reserved      = MIN_BASE_PRICE * Math.max(0, (remainingSlots || 1) - 1);
+
+  // Budget consumed as % of starting purse
+  const budgetPct     = Math.min(100, ((DEFAULT_TEAM_PURSE - teamBalance) / DEFAULT_TEAM_PURSE) * 100);
+  const isLow         = !isFull && teamBalance < MIN_BASE_PRICE * remainingSlots;
+  const isBankrupt    = teamBalance === 0;
 
   return (
     <div className="card-elevated p-5 relative overflow-hidden">
@@ -38,14 +49,54 @@ export function MyBalanceWidget({ team }) {
           </span>
         </div>
 
+        {/* Main balance number */}
         <div className="flex items-end gap-1">
-          <span className="text-gold-400 font-rajdhani text-3xl font-bold leading-none">
+          <span className={`font-rajdhani text-3xl font-bold leading-none ${isBankrupt ? 'text-red-400' : isLow ? 'text-amber-400' : 'text-gold-400'}`}>
             ₣
           </span>
-          <span className="font-rajdhani font-bold text-4xl leading-none text-white tracking-tight tabular-nums">
-            {(team.fire_coin_balance ?? 0).toLocaleString()}
+          <span className={`font-rajdhani font-bold text-4xl leading-none tracking-tight tabular-nums
+            ${isBankrupt ? 'text-red-400' : isLow ? 'text-amber-300' : 'text-white'}`}>
+            {teamBalance.toLocaleString()}
           </span>
         </div>
+
+        {/* Budget consumption bar */}
+        <div className="mt-2 h-1 rounded-full bg-surface-800 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-700
+              ${budgetPct > 85 ? 'bg-red-500' : budgetPct > 60 ? 'bg-amber-400' : 'bg-emerald-500'}`}
+            style={{ width: `${budgetPct}%` }}
+          />
+        </div>
+        <p className="text-[9px] text-muted font-inter mt-1">
+          {Math.round(budgetPct)}% of ₣{DEFAULT_TEAM_PURSE.toLocaleString()} starting purse spent
+        </p>
+
+        {/* ── Dynamic Max Bid section ───────────────────────────────────────── */}
+        {!isFull && remainingSlots > 0 && (
+          <div className={`mt-3 pt-3 border-t flex flex-col gap-1.5
+            ${isLow ? 'border-red-500/20' : 'border-surface-600/50'}`}>
+            <div className="flex items-center justify-between">
+              <span className={`text-[9px] font-rajdhani font-black uppercase tracking-widest
+                ${isLow ? 'text-red-400' : 'text-slate-400'}`}>
+                Max Bid Allowed
+              </span>
+              <span className={`font-rajdhani font-black text-sm tabular-nums
+                ${isLow ? 'text-red-400' : 'text-white'}`}>
+                ₣{maxAllowedBid.toLocaleString()}
+              </span>
+            </div>
+            <p className="text-[9px] text-muted font-inter leading-relaxed">
+              ₣{teamBalance.toLocaleString()} purse
+              {reserved > 0 && <> − <span className="text-amber-500/80">₣{reserved.toLocaleString()} reserved</span> for {remainingSlots - 1} more slot{remainingSlots - 1 !== 1 ? 's' : ''}</>}
+            </p>
+            {isLow && (
+              <p className="text-[9px] text-red-400 font-inter font-semibold">
+                ⚠️ Low balance — may not cover minimum bids for remaining slots
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ── 4-Player Roster Status Mini Bar ──────────────────────────────── */}
         <div className="mt-4 pt-3 border-t border-surface-600/50 space-y-2">
@@ -89,7 +140,7 @@ export function MyBalanceWidget({ team }) {
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-muted font-inter pt-1">
-            <span>{team.name || team.team_name}</span>
+            <span>{getTeamDisplayName(team.id, team.name || team.team_name)}</span>
             <span className="text-amber-400/90 font-semibold">{remainingSlots} Draft Slot{remainingSlots !== 1 ? 's' : ''} Open</span>
           </div>
         </div>

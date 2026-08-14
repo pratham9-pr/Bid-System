@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuctionRoom } from '../hooks/useAuctionRoom';
 import { useAllTeams } from '../hooks/useAllTeams';
 import { PlayerRevealCard } from '../components/PlayerRevealCard';
+import { getTeamDisplayName } from '../config/teamsConfig';
 
 // ─── SOLD OUT Stamp Component ────────────────────────────────────────────────
 function SoldOutStamp({ winnerName, winningBid }) {
@@ -107,7 +108,7 @@ export default function BroadcastOverlay() {
                     ${isBankrupt ? 'border-red-500/40 opacity-40' : isLow ? 'border-amber-500/40' : ''}`}
                 >
                   <span className="font-rajdhani font-bold text-xs text-slate-300 truncate max-w-[110px]">
-                    {t.name || t.team_name}
+                    {getTeamDisplayName(t.id, t.name || t.team_name)}
                   </span>
                   <span
                     className={`font-rajdhani font-black text-xs tabular-nums

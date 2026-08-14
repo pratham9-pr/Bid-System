@@ -19,8 +19,8 @@ export const FRANCHISE_CAPTAINS = {
     status: 'captain',
     current_bid: 0,
     team_id: 'alpha_wolves',
-    team_name: 'Alpha Wolves',
-    title: 'Alpha Wolves Captain',
+    team_name: 'POWER HAWKS',
+    title: 'POWER HAWKS Captain',
   },
   beta_strikers: {
     id: 'captain_beta_strikers',
@@ -35,8 +35,8 @@ export const FRANCHISE_CAPTAINS = {
     status: 'captain',
     current_bid: 0,
     team_id: 'beta_strikers',
-    team_name: 'Beta Strikers',
-    title: 'Beta Strikers Captain',
+    team_name: 'TEAM VORTEX',
+    title: 'TEAM VORTEX Captain',
   },
   gamma_reapers: {
     id: 'captain_gamma_reapers',
@@ -51,8 +51,8 @@ export const FRANCHISE_CAPTAINS = {
     status: 'captain',
     current_bid: 0,
     team_id: 'gamma_reapers',
-    team_name: 'Gamma Reapers',
-    title: 'Gamma Reapers Captain',
+    team_name: 'PENDING',
+    title: 'PENDING Team Captain',
   },
   delta_phantoms: {
     id: 'captain_delta_phantoms',
@@ -67,8 +67,8 @@ export const FRANCHISE_CAPTAINS = {
     status: 'captain',
     current_bid: 0,
     team_id: 'delta_phantoms',
-    team_name: 'Delta Phantoms',
-    title: 'Delta Phantoms Captain',
+    team_name: 'PENDING',
+    title: 'PENDING Team Captain',
   },
 };
 

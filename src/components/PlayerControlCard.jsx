@@ -13,6 +13,7 @@ import {
   manualSellToTeam,
 } from '../services/auctionService';
 import { RoleBadge } from './RoleBadge';
+import { TEAMS_CONFIG, getTeamDisplayName } from '../config/teamsConfig';
 
 // ─── Status dot ───────────────────────────────────────────────────────────────
 const StatusDot = ({ status, isCaptain }) => {
@@ -53,12 +54,8 @@ const SkipIcon = () => (
   </svg>
 );
 
-const TEAMS_LIST = [
-  { id: 'alpha_wolves', name: 'Alpha Wolves' },
-  { id: 'beta_strikers', name: 'Beta Strikers' },
-  { id: 'gamma_reapers', name: 'Gamma Reapers' },
-  { id: 'delta_phantoms', name: 'Delta Phantoms' },
-];
+// Map config format for local use
+const TEAMS_LIST = TEAMS_CONFIG.map((t) => ({ id: t.id, name: t.name }));
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  PlayerControlCard — displays a single player with:
@@ -143,7 +140,21 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
                 </span>
               )}
 
-              {isActive && <span className="badge-active text-[9px] px-1.5 py-0.5">Live</span>}
+              {/* Active / Revealed status badges */}
+              {isActive && isRevealed && (
+                <span className="px-2 py-0.5 rounded text-[9px] font-rajdhani font-black uppercase tracking-wider
+                                 bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 flex items-center gap-1 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  ⚡ Revealed on Stage
+                </span>
+              )}
+              {isActive && !isRevealed && (
+                <span className="px-2 py-0.5 rounded text-[9px] font-rajdhani font-black uppercase tracking-wider
+                                 bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  🔒 Queued on Stage
+                </span>
+              )}
               
               {player.status === 'unsold' && !isCaptain && (
                 <span className="text-[9px] px-1.5 py-0.5 rounded font-rajdhani font-bold
@@ -201,9 +212,9 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
                 onChange={(e) => {
                   const teamId = e.target.value;
                   if (!teamId) return;
-                  const teamList = teams.length > 0 ? teams : TEAMS_LIST.map((t) => ({ id: t.id, team_name: t.name }));
+                  const teamList = teams.length > 0 ? teams : TEAMS_CONFIG;
                   const team = teamList.find((t) => t.id === teamId);
-                  const teamName = team?.team_name || team?.name || teamId;
+                  const teamName = getTeamDisplayName(teamId, team?.team_name || team?.name);
                   run('appoint', () => appointTeamCaptain(player.id, teamId, teamName));
                 }}
                 disabled={!!loading}
@@ -215,9 +226,9 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
                 <option value="" disabled className="bg-surface-900 text-muted">
                   Appoint Captain ▾
                 </option>
-                {(teams.length > 0 ? teams : TEAMS_LIST.map((t) => ({ id: t.id, team_name: t.name }))).map((t) => (
+                {(teams.length > 0 ? teams : TEAMS_CONFIG).map((t) => (
                   <option key={t.id} value={t.id} className="bg-surface-900 text-white font-rajdhani font-bold">
-                    {t.team_name || t.name}
+                    {getTeamDisplayName(t.id, t.team_name || t.name)}
                   </option>
                 ))}
               </select>
@@ -253,31 +264,12 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
           {!isCaptain && (
             <button
               id={`admin-reveal-${player.id}`}
-              onClick={() =>
-                run('reveal', async () => {
-                  // Mark player active — captains are guarded upstream, but
-                  // defensively refuse to stage a captain here too
-                  if (player.is_captain) return { success: false, error: 'Captains cannot be staged for bidding.' };
-                  await supabase.from('players').update({ status: 'active' }).eq('id', player.id);
-                  await supabase.from('players').update({ status: 'upcoming' }).neq('id', player.id).eq('status', 'active');
-                  const response = await supabase
-                    .from('auction_state')
-                    .update({
-                      active_player_id: player.id,
-                      is_revealed:      true,
-                      bidding_open:     false,   // floor locked until host clicks Start Bidding
-                      status:           'bidding',
-                    })
-                    .eq('id', 1);
-                  if (response.error) return { success: false, error: response.error.message };
-                  return { success: true, playerName: player.in_game_name || player.name };
-                })
-              }
+              onClick={() => run('reveal', () => revealPlayer(player.id))}
               disabled={!!loading}
               className="px-3 py-1.5 rounded-lg text-[10px] font-inter font-black uppercase tracking-wider
                          bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]
                          hover:brightness-110 active:scale-95 transition-all flex items-center gap-1 cursor-pointer font-rajdhani text-xs"
-              title="Drop the player card on the live broadcast stage and open bidding immediately"
+              title="Drop the player card on the live broadcast stage and reveal immediately"
             >
               <span>⚡</span>
               <span>{isLoading('reveal') ? 'REVEALING…' : 'REVEAL PLAYER'}</span>
@@ -299,7 +291,7 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
           )}
 
           {/* 5. Quick Sell → Team (Manual Override) */}
-          {!isCaptain && player.status !== 'sold' && teams.length > 0 && (
+          {!isCaptain && player.status !== 'sold' && (
             <div className="relative inline-flex items-center">
               <select
                 id={`admin-quicksell-select-${player.id}`}
@@ -307,13 +299,14 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
                 onChange={(e) => {
                   const targetTeamId = e.target.value;
                   if (!targetTeamId) return;
-                  const team = teams.find((t) => t.id === targetTeamId);
-                  if (!team) return;
+                  const teamList = teams.length > 0 ? teams : TEAMS_CONFIG;
+                  const team = teamList.find((t) => t.id === targetTeamId);
+                  const targetTeamName = getTeamDisplayName(targetTeamId, team?.team_name || team?.name);
                   run('quickSell', () =>
                     manualSellToTeam(
                       player.id,
                       targetTeamId,
-                      team.team_name || team.name,
+                      targetTeamName,
                       player.current_bid || player.base_price || 0,
                     )
                   );
@@ -327,9 +320,9 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
                 <option value="" disabled className="bg-surface-900 text-muted">
                   Sell ▾
                 </option>
-                {teams.map((t) => (
+                {(teams.length > 0 ? teams : TEAMS_CONFIG).map((t) => (
                   <option key={t.id} value={t.id} className="bg-surface-900 text-white font-rajdhani font-bold">
-                    {t.team_name || t.name}
+                    {getTeamDisplayName(t.id, t.team_name || t.name)}
                   </option>
                 ))}
               </select>

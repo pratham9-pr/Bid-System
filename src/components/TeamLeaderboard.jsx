@@ -1,4 +1,5 @@
 import React from 'react';
+import { getTeamDisplayName } from '../config/teamsConfig';
 
 const medals = ['🥇', '🥈', '🥉'];
 
@@ -29,7 +30,9 @@ export function TeamLeaderboard({ teams }) {
               {/* Team info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-rajdhani font-bold text-sm text-white">{team.team_name}</span>
+                  <span className="font-rajdhani font-bold text-sm text-white">
+                    {getTeamDisplayName(team.id, team.team_name || team.name)}
+                  </span>
                   <span className={`font-rajdhani font-bold text-base
                     ${index === 0 ? 'text-gold-400' : 'text-slate-300'}`}>
                     ₣{team.fire_coin_balance.toLocaleString()}

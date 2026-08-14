@@ -1,42 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { TEAMS_CONFIG } from '../config/teamsConfig';
 
-// ─── Team / Role Configurations ──────────────────────────────────────────────
-const TEAMS_CONFIG = [
-  {
-    id: 'alpha_wolves',
-    name: 'Alpha Wolves',
-    owner: 'Pending',
-    logo: '/alpha-wolves.png',
-    fallbackLogo: '/alpha-wolves.png.png',
-    color: 'border-fire-500/40 text-fire-400 bg-fire-500/10 hover:border-fire-500/80 hover:bg-fire-500/20 shadow-[0_0_20px_rgba(249,115,22,0.15)]',
-  },
-  {
-    id: 'beta_strikers',
-    name: 'Beta Strikers',
-    owner: 'Pending',
-    logo: '/beta-strikers.png',
-    fallbackLogo: '/beta-strikers.png.png',
-    color: 'border-sky-500/40 text-sky-400 bg-sky-500/10 hover:border-sky-500/80 hover:bg-sky-500/20 shadow-[0_0_20px_rgba(14,165,233,0.15)]',
-  },
-  {
-    id: 'gamma_reapers',
-    name: 'Gamma Reapers',
-    owner: 'Pending',
-    logo: '/gamma-reapers.png',
-    fallbackLogo: '/gamma-reapers.png.png',
-    color: 'border-purple-500/40 text-purple-400 bg-purple-500/10 hover:border-purple-500/80 hover:bg-purple-500/20 shadow-[0_0_20px_rgba(168,85,247,0.15)]',
-  },
-  {
-    id: 'delta_phantoms',
-    name: 'Delta Phantoms',
-    owner: 'Pending',
-    logo: '/delta-phantoms.png',
-    fallbackLogo: '/delta-phantoms.png.png',
-    color: 'border-amber-500/40 text-amber-400 bg-amber-500/10 hover:border-amber-500/80 hover:bg-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.15)]',
-  },
-];
+// ─── Team / Role Configurations — imported from central config ───────────────
+// Team names are managed in src/config/teamsConfig.js
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const LockIcon = () => (

@@ -1,8 +1,29 @@
 import { supabase } from '../config/supabase';
 
 // ─── GLOBAL AUCTION CONSTRAINTS ───────────────────────────────────────────────
-export const MAX_BID_LIMIT = 30000;       // 30,000 FC max global auto-sell cap
-export const DEFAULT_TEAM_PURSE = 50000;  // 50,000 FC default starting team purse
+export const MAX_BID_LIMIT       = 30000; // 30,000 FC global auto-sell cap (hard ceiling)
+export const DEFAULT_TEAM_PURSE  = 30000; // 30,000 FC starting team purse
+export const MIN_BASE_PRICE      = 3000;  // Lowest possible player base price — used in max-bid formula
+
+/**
+ * Computes the maximum a team is ALLOWED to bid on the current player,
+ * preventing soft-locks where a team spends so much they can't afford
+ * the mandatory minimum bids for remaining open auction slots.
+ *
+ * Formula: remainingPurse - (MIN_BASE_PRICE × (remainingEmptySlots - 1))
+ *
+ * @param {number} remainingPurse     - Team's current fire_coin_balance
+ * @param {number} remainingEmptySlots - How many auction draft slots are still open (1–3)
+ * @returns {number} Maximum allowed bid amount (floored at 0)
+ */
+export function computeMaxAllowedBid(remainingPurse, remainingEmptySlots) {
+  if (!remainingPurse || remainingPurse <= 0) return 0;
+  const slotsAfterThis = Math.max(0, (remainingEmptySlots || 1) - 1);
+  const reserved = MIN_BASE_PRICE * slotsAfterThis;
+  const maxAllowed = Math.max(0, remainingPurse - reserved);
+  // Also respect the global hard cap
+  return Math.min(maxAllowed, MAX_BID_LIMIT);
+}
 
 // ─── Safe type helpers ────────────────────────────────────────────────────────
 // Guarantee a clean integer — returns 0 for null / undefined / NaN
@@ -31,6 +52,62 @@ export async function placeBid(playerId, teamId, bidAmount) {
     return data;
   } catch (err) {
     return { success: false, error: err.message || 'Network error placing bid' };
+  }
+}
+
+// ─── Safe auction_state updater ─────────────────────────────────────────────
+// Dynamically resolves singleton row ID (whether 1, 'current', or UUID)
+async function safeUpdateAuctionState(payload) {
+  try {
+    // 1. Get the existing row ID from auction_state
+    const { data: existingRows } = await supabase
+      .from('auction_state')
+      .select('id')
+      .limit(1);
+
+    const existingRow = existingRows && existingRows[0];
+
+    if (!existingRow) {
+      // If table has no rows, create the row
+      const { data: inserted, error: insertErr } = await supabase
+        .from('auction_state')
+        .insert({ id: 1, ...payload })
+        .select()
+        .maybeSingle();
+
+      if (insertErr) {
+        await supabase.from('auction_state').insert({ id: 'current', ...payload });
+      }
+      return { data: inserted, error: null };
+    }
+
+    const rowId = existingRow.id;
+
+    // 2. Perform the update targeting the actual row ID
+    let { data, error } = await supabase
+      .from('auction_state')
+      .update(payload)
+      .eq('id', rowId)
+      .select();
+
+    // 3. If schema cache column error, strip optional columns and retry
+    if (error && error.message && (error.message.includes('bidding_open') || error.message.includes('is_revealed') || error.message.includes('schema cache'))) {
+      console.warn('auction_state column missing, retrying with core columns:', error.message);
+      const cleanPayload = { ...payload };
+      delete cleanPayload.bidding_open;
+      delete cleanPayload.is_revealed;
+      const retryRes = await supabase
+        .from('auction_state')
+        .update(cleanPayload)
+        .eq('id', rowId)
+        .select();
+      data = retryRes.data;
+      error = retryRes.error;
+    }
+
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err };
   }
 }
 
@@ -63,19 +140,15 @@ export async function setPlayerActive(playerId) {
       .eq('status', 'active');
 
     // 4. Update auction_state: queue player but keep unrevealed & bidding locked
-    //    auction_state.id is INTEGER = 1, never pass the string "current"
-    const { error: stateError } = await supabase
-      .from('auction_state')
-      .update({
-        active_player_id:      pId,
-        is_revealed:           false,
-        bidding_open:          false,
-        status:                'idle',
-        current_bid:           safeNum(player?.current_bid ?? player?.base_price, 0),
-        max_bid_limit:         MAX_BID_LIMIT,
-        highest_bidder_team_id: null,
-      })
-      .eq('id', STATE_ROW);
+    const { error: stateError } = await safeUpdateAuctionState({
+      active_player_id:      pId,
+      is_revealed:           false,
+      bidding_open:          false,
+      status:                'idle',
+      current_bid:           safeNum(player?.current_bid ?? player?.base_price, 0),
+      max_bid_limit:         MAX_BID_LIMIT,
+      highest_bidder_team_id: null,
+    });
 
     if (stateError) {
       console.warn('auction_state update notice:', stateError.message);
@@ -88,21 +161,88 @@ export async function setPlayerActive(playerId) {
 }
 
 // ── Reveal Player on Stage (triggers 3D flip — bidding stays locked until host opens floor) ───
-export async function revealPlayer() {
+export async function revealPlayer(playerId) {
   try {
-    const response = await supabase
-      .from('auction_state')
-      .update({
-        is_revealed:  true,
-        bidding_open: false,   // floor stays locked; host must click "Start Bidding"
-        status:       'revealed',
-      })
-      .eq('id', STATE_ROW);
+    let pId = playerId ? String(playerId) : null;
+    let player = null;
 
-    console.log('Reveal payload sent:', response);
+    if (pId) {
+      const { data } = await supabase
+        .from('players')
+        .select('*')
+        .eq('id', pId)
+        .maybeSingle();
+      player = data;
+    } else {
+      // 1. Check current active player in auction_state
+      const { data: stateRows } = await supabase
+        .from('auction_state')
+        .select('active_player_id')
+        .limit(1);
 
-    if (response.error) return { success: false, error: response.error.message };
-    return { success: true };
+      const stateData = stateRows && stateRows[0];
+
+      if (stateData?.active_player_id) {
+        pId = String(stateData.active_player_id);
+        const { data } = await supabase
+          .from('players')
+          .select('*')
+          .eq('id', pId)
+          .maybeSingle();
+        player = data;
+      } else {
+        // Fallback: If no player staged, pull upcoming players and find the first non-captain
+        const { data: nextPlayers } = await supabase
+          .from('players')
+          .select('*')
+          .eq('status', 'upcoming')
+          .order('in_game_name', { ascending: true })
+          .limit(10);
+
+        const eligible = (nextPlayers || []).find((p) => !p.is_captain);
+        if (eligible) {
+          pId = String(eligible.id);
+          player = eligible;
+        }
+      }
+    }
+
+    if (pId) {
+      if (player?.is_captain) {
+        return { success: false, error: 'Captains cannot be staged for bidding.' };
+      }
+
+      // Mark target player active in players table
+      await supabase
+        .from('players')
+        .update({ status: 'active' })
+        .eq('id', pId);
+
+      // Reset any other active players back to upcoming
+      await supabase
+        .from('players')
+        .update({ status: 'upcoming' })
+        .neq('id', pId)
+        .eq('status', 'active');
+    }
+
+    // Update auction_state with is_revealed: true
+    const payload = {
+      is_revealed:  true,
+      bidding_open: false,   // floor stays locked; host clicks "Start Bidding" to open
+      status:       'revealed',
+    };
+
+    if (pId) {
+      payload.active_player_id = pId;
+      payload.current_bid      = safeNum(player?.current_bid ?? player?.base_price, 0);
+      payload.max_bid_limit    = MAX_BID_LIMIT;
+    }
+
+    const { error: stateError } = await safeUpdateAuctionState(payload);
+
+    if (stateError) return { success: false, error: stateError.message };
+    return { success: true, playerName: player?.in_game_name || player?.name || 'Player' };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -111,10 +251,7 @@ export async function revealPlayer() {
 // ── Open Bidding Floor (host explicitly allows bids after reveal) ─────────────
 export async function startBidding() {
   try {
-    const { error } = await supabase
-      .from('auction_state')
-      .update({ bidding_open: true, status: 'bidding' })
-      .eq('id', STATE_ROW);
+    const { error } = await safeUpdateAuctionState({ bidding_open: true, status: 'bidding' });
 
     if (error) return { success: false, error: error.message };
     return { success: true };
@@ -126,10 +263,7 @@ export async function startBidding() {
 // ── Close Bidding Floor (host locks bids mid-session if needed) ───────────────
 export async function closeBidding() {
   try {
-    const { error } = await supabase
-      .from('auction_state')
-      .update({ bidding_open: false, status: 'revealed' })
-      .eq('id', STATE_ROW);
+    const { error } = await safeUpdateAuctionState({ bidding_open: false, status: 'revealed' });
 
     if (error) return { success: false, error: error.message };
     return { success: true };
@@ -140,10 +274,7 @@ export async function closeBidding() {
 
 export async function hidePlayer() {
   try {
-    const { error } = await supabase
-      .from('auction_state')
-      .update({ is_revealed: false, status: 'idle' })
-      .eq('id', STATE_ROW);
+    const { error } = await safeUpdateAuctionState({ is_revealed: false, status: 'idle' });
 
     if (error) return { success: false, error: error.message };
     return { success: true };
@@ -161,7 +292,7 @@ export async function forcePlayerSold(playerId) {
     if (error) {
       // Direct fallback — use integer id, never the string "current"
       await supabase.from('players').update({ status: 'sold' }).eq('id', pId);
-      await supabase.from('auction_state').update({ status: 'sold' }).eq('id', STATE_ROW);
+      await safeUpdateAuctionState({ status: 'sold' });
       return { success: true };
     }
     return data;
@@ -212,16 +343,13 @@ export async function manualSellToTeam(playerId, teamId, teamName, price) {
     if (playerError) return { success: false, error: playerError.message };
 
     // 3. Update auction_state row 1 (integer)
-    await supabase
-      .from('auction_state')
-      .update({
-        status:                 'sold',
-        bidding_open:           false,
-        is_revealed:            true,
-        highest_bidder_team_id: tId,
-        current_bid:            sellPrice,
-      })
-      .eq('id', STATE_ROW);
+    await safeUpdateAuctionState({
+      status:                 'sold',
+      bidding_open:           false,
+      is_revealed:            true,
+      highest_bidder_team_id: tId,
+      current_bid:            sellPrice,
+    });
 
     // 4. Deduct sell price from winning team's balance
     const { data: teamData } = await supabase
@@ -258,10 +386,7 @@ export async function markUnsold(playerId) {
     if (error) {
       // Direct fallback — integer id only
       await supabase.from('players').update({ status: 'unsold' }).eq('id', pId);
-      await supabase
-        .from('auction_state')
-        .update({ active_player_id: null, status: 'idle' })
-        .eq('id', STATE_ROW);
+      await safeUpdateAuctionState({ active_player_id: null, status: 'idle' });
       return { success: true };
     }
     return data;
@@ -281,10 +406,7 @@ export async function toggleAuctionPause() {
     const isCurrentlyPaused = stateData?.status === 'paused' || stateData?.auction_paused === true;
     const newStatus = isCurrentlyPaused ? 'bidding' : 'paused';
 
-    await supabase
-      .from('auction_state')
-      .update({ status: newStatus, auction_paused: !isCurrentlyPaused })
-      .eq('id', STATE_ROW);
+    await safeUpdateAuctionState({ status: newStatus, auction_paused: !isCurrentlyPaused });
 
     try {
       await supabase.rpc('toggle_auction_pause');
@@ -420,6 +542,34 @@ export async function getTeamById(teamId) {
   return error ? null : data;
 }
 
+// ─── Safe player updater (handles missing is_captain column gracefully) ──────────
+async function safeUpdatePlayer(playerId, payload) {
+  const pId = String(playerId);
+  let { data, error } = await supabase
+    .from('players')
+    .update(payload)
+    .eq('id', pId)
+    .select()
+    .maybeSingle();
+
+  // If column error (e.g. is_captain missing in schema cache), strip is_captain and retry
+  if (error && error.message && error.message.includes('is_captain')) {
+    console.warn('players table missing is_captain column, retrying with core columns:', error.message);
+    const cleanPayload = { ...payload };
+    delete cleanPayload.is_captain;
+    const retryRes = await supabase
+      .from('players')
+      .update(cleanPayload)
+      .eq('id', pId)
+      .select()
+      .maybeSingle();
+    data = retryRes.data;
+    error = retryRes.error;
+  }
+
+  return { data, error };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  CAPTAIN APPOINTMENT (Host Control)
 //  Appoints player as franchise Captain, sets role to IGL, locks into team roster
@@ -440,34 +590,34 @@ export async function appointTeamCaptain(playerId, teamId, teamName) {
     }
 
     // 1. Clear any prior captain for this team
-    await supabase
-      .from('players')
-      .update({
-        is_captain:                  false,
-        status:                      'upcoming',
-        current_highest_bidder:      null,
-        current_highest_bidder_name: null,
-        sold_to_team_id:             null,
-      })
-      .or(`current_highest_bidder.eq.${tId},sold_to_team_id.eq.${tId}`)
-      .eq('is_captain', true);
+    try {
+      await supabase
+        .from('players')
+        .update({
+          is_captain:                  false,
+          status:                      'upcoming',
+          current_highest_bidder:      null,
+          current_highest_bidder_name: null,
+          sold_to_team_id:             null,
+        })
+        .or(`current_highest_bidder.eq.${tId},sold_to_team_id.eq.${tId}`);
+    } catch (e) {
+      // Ignore if fallback needed
+    }
 
     // 2. Appoint new captain: role='IGL', is_captain=true, status='sold', locked into team
-    const { data: updatedPlayer, error } = await supabase
-      .from('players')
-      .update({
-        is_captain:                  true,
-        role:                        'IGL',
-        status:                      'sold',
-        current_highest_bidder:      tId,
-        current_highest_bidder_name: tName,
-        sold_to_team_id:             tId,
-        current_bid:                 0,
-        sold_price:                  0,
-      })
-      .eq('id', pId)
-      .select()
-      .single();
+    const appointPayload = {
+      is_captain:                  true,
+      role:                        'IGL',
+      status:                      'sold',
+      current_highest_bidder:      tId,
+      current_highest_bidder_name: tName,
+      sold_to_team_id:             tId,
+      current_bid:                 0,
+      sold_price:                  0,
+    };
+
+    const { data: updatedPlayer, error } = await safeUpdatePlayer(pId, appointPayload);
 
     if (error) {
       console.error('Appoint captain error:', error);
@@ -483,16 +633,13 @@ export async function appointTeamCaptain(playerId, teamId, teamName) {
 export async function removeTeamCaptain(playerId) {
   try {
     const pId = String(playerId);
-    const { error } = await supabase
-      .from('players')
-      .update({
-        is_captain:                  false,
-        status:                      'upcoming',
-        current_highest_bidder:      null,
-        current_highest_bidder_name: null,
-        sold_to_team_id:             null,
-      })
-      .eq('id', pId);
+    const { error } = await safeUpdatePlayer(pId, {
+      is_captain:                  false,
+      status:                      'upcoming',
+      current_highest_bidder:      null,
+      current_highest_bidder_name: null,
+      sold_to_team_id:             null,
+    });
 
     if (error) return { success: false, error: error.message };
     return { success: true };

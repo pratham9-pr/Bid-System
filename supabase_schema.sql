@@ -22,11 +22,17 @@ CREATE TABLE IF NOT EXISTS public.teams (
 -- 3. Players Table
 CREATE TABLE IF NOT EXISTS public.players (
     id TEXT PRIMARY KEY DEFAULT ('P_' || substr(md5(random()::text), 1, 6)),
+    name TEXT,
     in_game_name TEXT NOT NULL,
     base_price BIGINT NOT NULL CHECK (base_price > 0),
     max_limit BIGINT NOT NULL CHECK (max_limit > base_price),
     role TEXT CHECK (role IN ('Rusher', 'Sniper', 'IGL', 'Supporter')),
     photo_url TEXT,
+    custom_card_url TEXT,
+    image_url TEXT,
+    is_captain BOOLEAN NOT NULL DEFAULT FALSE,
+    sold_to_team_id TEXT REFERENCES public.teams(id) ON DELETE SET NULL,
+    sold_price BIGINT DEFAULT 0,
     current_bid BIGINT NOT NULL,
     current_highest_bidder TEXT REFERENCES public.teams(id) ON DELETE SET NULL,
     current_highest_bidder_name TEXT,
@@ -39,6 +45,12 @@ CREATE TABLE IF NOT EXISTS public.auction_state (
     id TEXT PRIMARY KEY DEFAULT 'current',
     active_player_id TEXT REFERENCES public.players(id) ON DELETE SET NULL,
     auction_paused BOOLEAN NOT NULL DEFAULT FALSE,
+    is_revealed BOOLEAN NOT NULL DEFAULT FALSE,
+    bidding_open BOOLEAN NOT NULL DEFAULT FALSE,
+    status TEXT NOT NULL DEFAULT 'idle',
+    current_bid BIGINT NOT NULL DEFAULT 0,
+    highest_bidder_team_id TEXT,
+    max_bid_limit BIGINT NOT NULL DEFAULT 30000,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -379,15 +391,15 @@ BEGIN
     -- Seed Teams
     INSERT INTO public.teams (id, team_name, owner_name, owner_email, fire_coin_balance, last_bid_time)
     VALUES
-        ('TEAM_ALPHA', 'Alpha Wolves', 'Rahul', 'alpha@freefire.auction', 50000, NULL),
-        ('TEAM_BETA',  'Beta Strikers', 'Priya', 'beta@freefire.auction',  50000, NULL),
-        ('TEAM_GAMMA', 'Gamma Reapers', 'Arnav', 'gamma@freefire.auction', 50000, NULL),
-        ('TEAM_DELTA', 'Delta Phantoms', 'Sneha', 'delta@freefire.auction', 50000, NULL)
+        ('TEAM_ALPHA', 'POWER HAWKS',  'Rahul', 'alpha@freefire.auction', 30000, NULL),
+        ('TEAM_BETA',  'TEAM VORTEX',  'Priya', 'beta@freefire.auction',  30000, NULL),
+        ('TEAM_GAMMA', 'PENDING',       'TBD',   'gamma@freefire.auction', 30000, NULL),
+        ('TEAM_DELTA', 'PENDING',       'TBD',   'delta@freefire.auction', 30000, NULL)
     ON CONFLICT (id) DO UPDATE
     SET team_name = EXCLUDED.team_name,
         owner_name = EXCLUDED.owner_name,
         owner_email = EXCLUDED.owner_email,
-        fire_coin_balance = 50000,
+        fire_coin_balance = 30000,
         last_bid_time = NULL;
 
     -- Seed Players

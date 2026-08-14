@@ -41,6 +41,7 @@ function useAnimatedNumber(target, duration = 700) {
 
 import { useAllPlayers } from '../hooks/useAllPlayers';
 import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
+import { getTeamDisplayName } from '../config/teamsConfig';
 
 // ─── Team Row ────────────────────────────────────────────────────────────────
 function TeamRow({ team, rank, players = [] }) {
@@ -88,7 +89,7 @@ function TeamRow({ team, rank, players = [] }) {
         <div className="flex items-center gap-1.5">
           <p className={`font-rajdhani font-bold text-sm leading-none truncate transition-colors
             ${isBankrupt ? 'text-red-500/50' : 'text-slate-200'}`}>
-            {team.name || team.team_name}
+            {getTeamDisplayName(team.id, team.name || team.team_name)}
           </p>
           {isFull && (
             <span className="px-1.5 py-0.2 rounded bg-gold-500/20 text-gold-400 border border-gold-500/30 text-[8px] font-rajdhani font-black uppercase">
