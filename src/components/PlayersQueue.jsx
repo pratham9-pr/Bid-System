@@ -14,13 +14,22 @@ const StatusBadge = ({ status }) => {
 };
 
 export function PlayersQueue({ players, activePlayerId }) {
-  // Captains are locked into rosters — permanently excluded from the bidding pool
-  const biddablePlayers = players.filter((p) => !p.is_captain);
+  // Deduplicate all players by ID
+  const uniquePlayersMap = new Map();
+  for (const p of players || []) {
+    if (p && p.id && !uniquePlayersMap.has(String(p.id))) {
+      uniquePlayersMap.set(String(p.id), p);
+    }
+  }
+  const uniquePlayers = Array.from(uniquePlayersMap.values());
 
-  // 'unsold' players are re-listable, so group them with upcoming
-  const upcoming    = biddablePlayers.filter((p) => p.status === 'upcoming' || p.status === 'unsold');
-  const sold        = biddablePlayers.filter((p) => p.status === 'sold');
-  const captainCount = players.filter((p) => p.is_captain === true).length;
+  // Captains are locked into rosters — permanently excluded from the bidding pool
+  const biddablePlayers = uniquePlayers.filter((p) => !p.is_captain);
+
+  // 'unsold' players are re-listable, so group them with upcoming (excluding active player to prevent duplicate display)
+  const upcoming    = biddablePlayers.filter((p) => (p.status === 'upcoming' || p.status === 'unsold') && p.id !== activePlayerId);
+  const sold        = biddablePlayers.filter((p) => p.status === 'sold' && p.id !== activePlayerId);
+  const captainCount = uniquePlayers.filter((p) => p.is_captain === true).length;
 
   const PlayerRow = ({ player }) => {
     const isActive = player.id === activePlayerId;

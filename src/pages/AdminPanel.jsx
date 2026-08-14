@@ -42,9 +42,19 @@ export default function AdminPanel() {
   };
 
   const statusOrder = { active: 0, upcoming: 1, sold: 2, unsold: 3 };
+
+  // Deduplicate all players by unique ID
+  const uniquePlayersMap = new Map();
+  for (const p of players || []) {
+    if (p && p.id && !uniquePlayersMap.has(String(p.id))) {
+      uniquePlayersMap.set(String(p.id), p);
+    }
+  }
+  const uniquePlayers = Array.from(uniquePlayersMap.values());
+
   // Captains are permanently locked — separate from the auctionable pool
-  const captainPlayers  = [...players].filter((p) => p.is_captain === true);
-  const sortedPlayers   = [...players]
+  const captainPlayers  = uniquePlayers.filter((p) => p.is_captain === true);
+  const sortedPlayers   = uniquePlayers
     .filter((p) => !p.is_captain)
     .sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9));
 

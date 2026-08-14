@@ -105,19 +105,23 @@ export function MyBalanceWidget({ team }) {
             <div className="flex items-center gap-1.5 text-amber-400 font-black">
               <span>👑</span>
               <span>Captain:</span>
-              <span className="text-white font-bold">{captain?.name || captain?.in_game_name}</span>
+              <span className="text-white font-bold">{captain ? (captain.name || captain.in_game_name) : 'Unassigned'}</span>
             </div>
-            <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold uppercase">
-              Locked
+            <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase
+              ${captain ? 'bg-amber-500/20 text-amber-300' : 'bg-surface-700 text-muted'}`}>
+              {captain ? 'Locked' : 'Open'}
             </span>
           </div>
 
           {/* Draft Slots Indicator */}
           <div className="flex items-center gap-1.5 pt-1">
             {/* Slot 1: Captain */}
-            <div className="flex-1 py-1 px-1.5 rounded bg-amber-500/20 border border-amber-500/40 text-center" title={`Captain: ${captain?.name}`}>
-              <span className="text-[9px] font-rajdhani font-black text-amber-300 uppercase">
-                👑 {captain?.name?.split(' ')[0] || 'Captain'}
+            <div className={`flex-1 py-1 px-1.5 rounded text-center
+              ${captain ? 'bg-amber-500/20 border border-amber-500/40' : 'bg-surface-800 border border-dashed border-surface-600'}`}
+              title={captain ? `Captain: ${captain.name}` : 'Captain Slot Unassigned'}>
+              <span className={`text-[9px] font-rajdhani font-black uppercase
+                ${captain ? 'text-amber-300' : 'text-muted'}`}>
+                👑 {captain ? (captain.name?.split(' ')[0] || 'Captain') : 'Open'}
               </span>
             </div>
 

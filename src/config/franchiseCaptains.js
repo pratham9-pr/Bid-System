@@ -1,118 +1,57 @@
 // ─── FRANCHISE CAPTAINS & ROSTER ALLOCATION SPECIFICATION ──────────────────
-// Each franchise team has 1 pre-allocated, locked Captain (Slot 1)
-// Plus 3 remaining draftable/auctionable slots (Slots 2, 3, 4) -> 4 Total Players
+// All franchise slots start empty/unassigned by default.
+// Captains are dynamically appointed by the Host from the UI.
+// Once appointed, a captain occupies Slot 1 (and ONLY Slot 1) as locked IGL.
+// Slots 2, 3, 4 are strictly for auction-drafted players (sold via bidding with price > 0).
 
-export const MAX_ROSTER_SIZE = 4;     // Total 4 players per team
-export const MAX_AUCTION_SLOTS = 3;   // Max 3 players can be acquired via bidding
+export const MAX_ROSTER_SIZE   = 4; // Total 4 players per team (1 Captain + 3 Drafted)
+export const MAX_AUCTION_SLOTS = 3; // Max 3 players can be acquired via bidding
 
-export const FRANCHISE_CAPTAINS = {
-  alpha_wolves: {
-    id: 'captain_alpha_wolves',
-    name: 'Abhi Gamer',
-    in_game_name: 'Abhi Gamer',
-    role: 'IGL',
-    photo_url: '/players/abhi_gamer.jpg.jpeg',
-    custom_card_url: '/players/abhi_gamer.jpg.jpeg',
-    image_url: '/players/abhi_gamer.jpg.jpeg',
-    is_captain: true,
-    is_locked: true,
-    status: 'captain',
-    current_bid: 0,
-    team_id: 'alpha_wolves',
-    team_name: 'POWER HAWKS',
-    title: 'POWER HAWKS Captain',
-  },
-  beta_strikers: {
-    id: 'captain_beta_strikers',
-    name: 'Gauthuu',
-    in_game_name: 'Gauthuu',
-    role: 'IGL',
-    photo_url: '/players/gauthuu.jpg.jpeg',
-    custom_card_url: '/players/gauthuu.jpg.jpeg',
-    image_url: '/players/gauthuu.jpg.jpeg',
-    is_captain: true,
-    is_locked: true,
-    status: 'captain',
-    current_bid: 0,
-    team_id: 'beta_strikers',
-    team_name: 'TEAM VORTEX',
-    title: 'TEAM VORTEX Captain',
-  },
-  gamma_reapers: {
-    id: 'captain_gamma_reapers',
-    name: 'Invincible',
-    in_game_name: 'Invincible',
-    role: 'IGL',
-    photo_url: '/players/invincible.jpg.jpeg',
-    custom_card_url: '/players/invincible.jpg.jpeg',
-    image_url: '/players/invincible.jpg.jpeg',
-    is_captain: true,
-    is_locked: true,
-    status: 'captain',
-    current_bid: 0,
-    team_id: 'gamma_reapers',
-    team_name: 'PENDING',
-    title: 'PENDING Team Captain',
-  },
-  delta_phantoms: {
-    id: 'captain_delta_phantoms',
-    name: 'Nxt Sharuu',
-    in_game_name: 'Nxt Sharuu',
-    role: 'IGL',
-    photo_url: '/players/nxt_sharuu.jpg.jpeg',
-    custom_card_url: '/players/nxt_sharuu.jpg.jpeg',
-    image_url: '/players/nxt_sharuu.jpg.jpeg',
-    is_captain: true,
-    is_locked: true,
-    status: 'captain',
-    current_bid: 0,
-    team_id: 'delta_phantoms',
-    team_name: 'PENDING',
-    title: 'PENDING Team Captain',
-  },
-};
+export const FRANCHISE_CAPTAINS = {};
 
 /**
- * Returns the default designated captain for a given team ID.
+ * Returns null by default — captains must be explicitly appointed by host.
  */
 export function getCaptainForTeam(teamId) {
-  if (!teamId) return null;
-  const cleanId = String(teamId).toLowerCase().trim();
-  return FRANCHISE_CAPTAINS[cleanId] || {
-    id: `captain_${cleanId}`,
-    name: 'Team Captain',
-    in_game_name: 'Team Captain',
-    role: 'IGL',
-    photo_url: '/players/default.jpg',
-    is_captain: true,
-    is_locked: true,
-    status: 'captain',
-    current_bid: 0,
-    team_id: cleanId,
-    title: 'Franchise Captain',
-  };
+  return null;
 }
 
 /**
  * Returns full 4-slot roster for a franchise team:
- * [0]: Captain (Appointed in database OR pre-allocated default) - Role: IGL, Locked
- * [1..3]: Sold/Drafted players or null (Available Auction Slot)
+ * [0]: Captain (Appointed by host in database) - Role: IGL, Locked (or null if unassigned)
+ * [1..3]: Sold/Drafted players (or null if empty/available slot)
  */
 export function getTeamFullRoster(teamId, allPlayers = []) {
   if (!teamId) {
-    return { captain: null, auctionedPlayers: [], slots: [null, null, null, null], totalCount: 0, remainingSlots: 3, isFull: false };
+    return {
+      captain: null,
+      auctionedPlayers: [],
+      slots: [null, null, null, null],
+      totalCount: 0,
+      remainingSlots: 3,
+      isFull: false,
+    };
   }
 
   const cleanTeamId = String(teamId).toLowerCase().trim();
 
-  // 1. Check if a captain is appointed in Supabase for this franchise
-  const appointedCaptain = (allPlayers || []).find(
+  // 1. Deduplicate all incoming player objects by unique ID
+  const uniquePlayersMap = new Map();
+  for (const p of allPlayers || []) {
+    if (p && p.id && !uniquePlayersMap.has(String(p.id))) {
+      uniquePlayersMap.set(String(p.id), p);
+    }
+  }
+  const uniquePlayers = Array.from(uniquePlayersMap.values());
+
+  // 2. Check if a captain is explicitly appointed in database for this franchise
+  const appointedCaptain = uniquePlayers.find(
     (p) =>
       p.is_captain === true &&
-      (p.sold_to_team_id === cleanTeamId || p.current_highest_bidder === cleanTeamId)
+      (String(p.sold_to_team_id || '').toLowerCase() === cleanTeamId ||
+        String(p.current_highest_bidder || '').toLowerCase() === cleanTeamId)
   );
 
-  // 2. Resolve captain (appointed player or fallback default)
   const captain = appointedCaptain
     ? {
         ...appointedCaptain,
@@ -120,31 +59,54 @@ export function getTeamFullRoster(teamId, allPlayers = []) {
         is_captain: true,
         is_locked: true,
       }
-    : getCaptainForTeam(cleanTeamId);
+    : null;
 
-  // 3. Drafted players (players sold to this team excluding the captain)
-  const teamSold = (allPlayers || []).filter(
-    (p) =>
-      p.status === 'sold' &&
-      !p.is_captain &&
-      (p.sold_to_team_id === cleanTeamId || p.current_highest_bidder === cleanTeamId) &&
-      p.id !== captain?.id
-  );
+  const captainId = captain?.id ? String(captain.id) : null;
+  const captainName = (captain?.in_game_name || captain?.name || '').toLowerCase().trim();
+
+  // 3. Drafted players (players legitimately sold in auction with price > 0, excluding captain)
+  const seenDraftedIds = new Set();
+  const teamSold = [];
+
+  for (const p of uniquePlayers) {
+    const isSoldToThisTeam =
+      (p.status === 'sold' || p.status === 'active') &&
+      (String(p.sold_to_team_id || '').toLowerCase() === cleanTeamId ||
+        String(p.current_highest_bidder || '').toLowerCase() === cleanTeamId);
+
+    const isExplicitCaptain = p.is_captain === true;
+    const hasAuctionPrice = (p.current_bid > 0 || p.sold_price > 0);
+
+    // Only include real drafted players (non-captains with auction price > 0)
+    if (isSoldToThisTeam && !isExplicitCaptain && hasAuctionPrice && p.role !== 'IGL') {
+      const pid = String(p.id);
+      const pname = (p.in_game_name || p.name || '').toLowerCase().trim();
+
+      // Ensure captain is never duplicated into draft slots
+      if (pid !== captainId && (!captainName || pname !== captainName) && !seenDraftedIds.has(pid)) {
+        seenDraftedIds.add(pid);
+        teamSold.push(p);
+      }
+    }
+  }
+
+  // At most MAX_AUCTION_SLOTS (3) auction slots
+  const cappedSold = teamSold.slice(0, MAX_AUCTION_SLOTS);
 
   const slots = [
-    captain,
-    teamSold[0] || null,
-    teamSold[1] || null,
-    teamSold[2] || null,
+    captain || null,
+    cappedSold[0] || null,
+    cappedSold[1] || null,
+    cappedSold[2] || null,
   ];
 
   return {
-    captain,
-    auctionedPlayers: teamSold,
+    captain: captain || null,
+    auctionedPlayers: cappedSold,
     slots,
-    totalCount: (captain ? 1 : 0) + teamSold.length,
-    remainingSlots: Math.max(0, MAX_AUCTION_SLOTS - teamSold.length),
-    isFull: teamSold.length >= MAX_AUCTION_SLOTS,
+    totalCount: (captain ? 1 : 0) + cappedSold.length,
+    remainingSlots: Math.max(0, MAX_AUCTION_SLOTS - cappedSold.length),
+    isFull: cappedSold.length >= MAX_AUCTION_SLOTS && Boolean(captain),
   };
 }
 
@@ -153,11 +115,19 @@ export function getTeamFullRoster(teamId, allPlayers = []) {
  */
 export function isTeamRosterFull(teamId, allPlayers = []) {
   const cleanTeamId = String(teamId).toLowerCase().trim();
-  const teamSold = (allPlayers || []).filter(
-    (p) =>
+  const seenDraftedIds = new Set();
+  for (const p of allPlayers || []) {
+    if (
+      p &&
       p.status === 'sold' &&
       !p.is_captain &&
-      (p.sold_to_team_id === cleanTeamId || p.current_highest_bidder === cleanTeamId)
-  );
-  return teamSold.length >= MAX_AUCTION_SLOTS;
+      p.role !== 'IGL' &&
+      ((p.current_bid ?? 0) > 0 || (p.sold_price ?? 0) > 0) &&
+      (String(p.sold_to_team_id || '').toLowerCase() === cleanTeamId ||
+        String(p.current_highest_bidder || '').toLowerCase() === cleanTeamId)
+    ) {
+      seenDraftedIds.add(String(p.id));
+    }
+  }
+  return seenDraftedIds.size >= MAX_AUCTION_SLOTS;
 }

@@ -639,12 +639,63 @@ export async function removeTeamCaptain(playerId) {
       current_highest_bidder:      null,
       current_highest_bidder_name: null,
       sold_to_team_id:             null,
+      sold_price:                  0,
     });
 
     if (error) return { success: false, error: error.message };
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
+  }
+}
+
+export async function removePlayerFromRoster(playerId) {
+  return removeTeamCaptain(playerId);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  CLEAR ALL ROSTERS & CAPTAINS (Empty all slots & restore purses)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function resetAllRostersAndCaptains() {
+  try {
+    // 1. Fetch all players to reset their bids to their own base_price
+    const { data: allP } = await supabase.from('players').select('id, base_price');
+
+    if (allP && allP.length > 0) {
+      for (const p of allP) {
+        await safeUpdatePlayer(p.id, {
+          status:                      'upcoming',
+          is_captain:                  false,
+          sold_to_team_id:             null,
+          sold_price:                  0,
+          current_highest_bidder:      null,
+          current_highest_bidder_name: null,
+          current_bid:                 p.base_price || 0,
+        });
+      }
+    }
+
+    // 2. Reset team balances to default purse (30,000 FC)
+    await supabase.from('teams').update({
+      fire_coin_balance: DEFAULT_TEAM_PURSE,
+      last_bid_time:     null,
+    }).neq('id', '___NEVER_MATCH___');
+
+    // 3. Reset auction state
+    await safeUpdateAuctionState({
+      active_player_id:        null,
+      is_revealed:             false,
+      bidding_open:            false,
+      status:                  'idle',
+      current_bid:             0,
+      highest_bidder_team_id:  null,
+      auction_paused:          false,
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error('Reset all rosters error:', err);
+    return { success: false, error: err.message || 'Failed to reset rosters' };
   }
 }
 

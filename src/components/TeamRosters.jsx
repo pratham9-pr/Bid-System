@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { RoleBadge } from './RoleBadge';
 import { getTeamFullRoster, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
-import { appointTeamCaptain, removeTeamCaptain } from '../services/auctionService';
+import { appointTeamCaptain, removeTeamCaptain, removePlayerFromRoster, resetAllRostersAndCaptains, DEFAULT_TEAM_PURSE } from '../services/auctionService';
 import { getTeamLogo, getTeamDisplayName, TEAMS_CONFIG } from '../config/teamsConfig';
-import { DEFAULT_TEAM_PURSE } from '../services/auctionService';
 
 // Team logo helper — uses central config so name/logo changes propagate everywhere
 const getTeamLogoUrl = (teamId) => getTeamLogo(teamId);
@@ -13,7 +12,66 @@ function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamNa
   const [showMenu, setShowMenu] = useState(false);
   const [loading, setLoading]   = useState(false);
 
+  const eligibleForCaptain = (allPlayers || []).filter(
+    (p) => !p.is_captain || p.sold_to_team_id === teamId
+  );
+
   if (!player) {
+    if (isCaptain) {
+      return (
+        <div
+          className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl
+                     border-2 border-dashed border-amber-500/30 bg-amber-500/5
+                     min-h-[170px] text-center select-none hover:border-amber-400/50 transition-colors"
+        >
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-400 text-sm font-rajdhani font-black">
+            👑
+          </div>
+          <div className="space-y-0.5">
+            <span className="text-[10px] font-rajdhani font-black text-amber-300 uppercase tracking-widest block">
+              Captain Slot
+            </span>
+            <span className="text-[9px] text-muted font-inter block">
+              Unassigned
+            </span>
+          </div>
+
+          <div className="relative inline-flex items-center mt-1">
+            <select
+              value=""
+              onChange={async (e) => {
+                const selectedPlayerId = e.target.value;
+                if (!selectedPlayerId) return;
+                setLoading(true);
+                await appointTeamCaptain(selectedPlayerId, teamId, teamName);
+                setLoading(false);
+                onAppoint?.();
+              }}
+              disabled={loading}
+              className="appearance-none pl-2 pr-4 py-0.5 rounded text-[8px] font-rajdhani font-black uppercase tracking-widest
+                         bg-black/60 text-amber-300 border border-amber-500/40 hover:border-amber-400
+                         hover:bg-amber-500/20 transition-all cursor-pointer focus:outline-none"
+              title="Appoint a Captain for this team"
+            >
+              <option value="" disabled className="bg-surface-900 text-muted">
+                + Appoint
+              </option>
+              {eligibleForCaptain.map((p) => (
+                <option key={p.id} value={p.id} className="bg-surface-900 text-white font-rajdhani font-bold">
+                  {p.in_game_name || p.name} (IGL)
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-amber-400">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-2 h-2">
+                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div
         className="flex flex-col items-center justify-center gap-2 p-3 rounded-2xl
@@ -34,10 +92,6 @@ function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamNa
       </div>
     );
   }
-
-  const eligibleForCaptain = (allPlayers || []).filter(
-    (p) => !p.is_captain || p.sold_to_team_id === teamId
-  );
 
   return (
     <div
@@ -92,9 +146,22 @@ function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamNa
           <span className="text-[9px] font-rajdhani font-bold text-slate-400 uppercase tracking-wider">
             Slot #{slotIndex + 1}
           </span>
-          <span className="text-[8px] font-rajdhani font-bold text-gold-400 bg-gold-500/10 px-1.5 py-0.2 rounded border border-gold-500/20 uppercase">
-            Drafted
-          </span>
+          <button
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (window.confirm(`Release ${player.in_game_name || player.name} from this roster?`)) {
+                setLoading(true);
+                await removePlayerFromRoster(player.id);
+                setLoading(false);
+                onAppoint?.();
+              }
+            }}
+            disabled={loading}
+            className="text-[8px] font-rajdhani font-black text-red-400 hover:text-red-300 hover:bg-red-500/20 bg-red-500/10 px-1.5 py-0.2 rounded border border-red-500/30 uppercase cursor-pointer transition-colors"
+            title="Release this player back to upcoming pool"
+          >
+            ✕ Release
+          </button>
         </div>
       )}
 
@@ -259,7 +326,7 @@ function TeamRosterCard({ team, allPlayers, onAppoint }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {slots.map((player, idx) => (
             <RosterPlayerCell
-              key={player?.id || `empty-slot-${idx}`}
+              key={player?.id ? `roster-${teamId}-${player.id}` : `empty-${teamId}-slot-${idx}`}
               player={player}
               slotIndex={idx}
               isCaptain={idx === 0}
@@ -279,6 +346,26 @@ function TeamRosterCard({ team, allPlayers, onAppoint }) {
 //  TeamRosters — main export
 // ─────────────────────────────────────────────────────────────────────────────
 export function TeamRosters({ teams, players, loading, onAppoint }) {
+  const [resetting, setResetting] = useState(false);
+  const [resetMsg, setResetMsg]   = useState(null);
+
+  const handleResetAll = async () => {
+    if (!window.confirm('Are you sure you want to completely empty all franchise rosters & captains? All players will be restored to upcoming and team balances set to 30,000 FC.')) {
+      return;
+    }
+    setResetting(true);
+    setResetMsg(null);
+    const result = await resetAllRostersAndCaptains();
+    setResetting(false);
+    if (result.success) {
+      setResetMsg('✓ All rosters, captains, and balances have been successfully reset & emptied.');
+      onAppoint?.();
+      setTimeout(() => setResetMsg(null), 5000);
+    } else {
+      setResetMsg(`✗ Failed to reset: ${result.error}`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-24">
@@ -295,22 +382,69 @@ export function TeamRosters({ teams, players, loading, onAppoint }) {
     );
   }
 
-  // Filter sold players (excluding captains)
-  const soldPlayers = (players || []).filter((p) => p.status === 'sold' && !p.is_captain);
-  const appointedCaptainsCount = (players || []).filter((p) => p.is_captain === true).length;
-  const totalCaptains = teams.length;
+  // Deduplicate all players by ID
+  const uniquePlayersMap = new Map();
+  for (const p of players || []) {
+    if (p && p.id && !uniquePlayersMap.has(String(p.id))) {
+      uniquePlayersMap.set(String(p.id), p);
+    }
+  }
+  const uniquePlayers = Array.from(uniquePlayersMap.values());
+
+  // Filter sold players (excluding captains) with distinct IDs
+  const soldPlayers = uniquePlayers.filter((p) => p.status === 'sold' && !p.is_captain);
+  
+  // Calculate active captains count
+  let activeCaptainsCount = 0;
+  for (const t of teams) {
+    const { captain } = getTeamFullRoster(t.id, uniquePlayers);
+    if (captain) activeCaptainsCount++;
+  }
+
   const totalDrafted  = soldPlayers.length;
-  const totalRosterPlayers = totalCaptains + totalDrafted;
-  const totalAvailableAuctionSlots = (teams.length * MAX_AUCTION_SLOTS) - totalDrafted;
+  const totalRosterPlayers = activeCaptainsCount + totalDrafted;
+  const totalAvailableAuctionSlots = Math.max(0, (teams.length * MAX_AUCTION_SLOTS) - totalDrafted);
   const totalCoinsSpent = soldPlayers.reduce((s, p) => s + (p.current_bid ?? p.sold_price ?? 0), 0);
 
   return (
     <div className="space-y-5">
+      {/* ── Action Bar & Reset Notification ──────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-surface-800/80 border border-surface-600/40">
+        <div>
+          <h3 className="font-rajdhani font-bold text-base text-white">Franchise Rosters Management</h3>
+          <p className="text-xs text-muted font-inter">
+            Appoint leaders for each team and view drafted players in real-time.
+          </p>
+        </div>
+
+        <button
+          id="admin-reset-all-rosters-btn"
+          onClick={handleResetAll}
+          disabled={resetting}
+          className="px-3.5 py-2 rounded-xl text-xs font-rajdhani font-black uppercase tracking-wider
+                     bg-red-500/15 text-red-300 border border-red-500/30 hover:bg-red-500/25 hover:border-red-500/60
+                     transition-all cursor-pointer disabled:opacity-40 flex items-center justify-center gap-1.5 shadow-sm"
+          title="Reset and clear all team rosters, captains, and drafted players"
+        >
+          <span>🗑️</span>
+          <span>{resetting ? 'Resetting Rosters…' : 'Empty All Slots & Rosters'}</span>
+        </button>
+      </div>
+
+      {resetMsg && (
+        <div
+          className={`p-3 rounded-xl text-xs font-rajdhani font-bold uppercase tracking-wider border animate-fade-in
+            ${resetMsg.startsWith('✓') ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}
+        >
+          {resetMsg}
+        </div>
+      )}
+
       {/* ── Summary strip ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: 'Total Lineup Slots',    value: `${totalRosterPlayers} / ${teams.length * MAX_ROSTER_SIZE}`, color: 'text-white' },
-          { label: 'Franchise Captains',    value: `${totalCaptains} Appointed (IGL)`,                         color: 'text-amber-400' },
+          { label: 'Franchise Captains',    value: `${activeCaptainsCount} Appointed (IGL)`,                   color: 'text-amber-400' },
           { label: 'Auction Draft Slots',   value: `${totalDrafted} / ${teams.length * MAX_AUCTION_SLOTS} (${totalAvailableAuctionSlots} Open)`, color: 'text-gold-400' },
           { label: 'Total Coins Spent',     value: `₣${totalCoinsSpent.toLocaleString()}`,                     color: 'text-fire-400' },
         ].map(({ label, value, color }) => (

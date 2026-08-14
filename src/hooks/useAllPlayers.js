@@ -23,7 +23,18 @@ export function useAllPlayers() {
         .order('in_game_name', { ascending: true });
 
       if (error) throw error;
-      setPlayers(data || []);
+
+      // Deduplicate by distinct player ID
+      const deduplicated = [];
+      const seenIds = new Set();
+      for (const p of data || []) {
+        if (p && p.id && !seenIds.has(String(p.id))) {
+          seenIds.add(String(p.id));
+          deduplicated.push(p);
+        }
+      }
+
+      setPlayers(deduplicated);
     } catch (err) {
       setError(err.message);
     } finally {
