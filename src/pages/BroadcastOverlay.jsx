@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuctionRoom } from '../hooks/useAuctionRoom';
 import { useAllTeams } from '../hooks/useAllTeams';
+import { useAllPlayers } from '../hooks/useAllPlayers';
 import { PlayerRevealCard } from '../components/PlayerRevealCard';
-import { getTeamDisplayName } from '../config/teamsConfig';
+import { getTeamDisplayName, getTeamOwner } from '../config/teamsConfig';
+import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
 
 // ─── SOLD OUT Stamp Component ────────────────────────────────────────────────
 function SoldOutStamp({ winnerName, winningBid }) {
@@ -63,8 +65,113 @@ function SoldOutStamp({ winnerName, winningBid }) {
   );
 }
 
-import { useAllPlayers } from '../hooks/useAllPlayers';
-import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
+// ─── Dual Franchise Roster Bar (Bottom HUD) ──────────────────────────────────
+function BroadcastDualRosters({ teams, players }) {
+  const activeTeams = (teams || []).filter((t) => {
+    const clean = String(t.id).toLowerCase();
+    return (
+      clean.includes('alpha') ||
+      clean.includes('beta') ||
+      clean.includes('power') ||
+      clean.includes('vortex')
+    );
+  });
+
+  return (
+    <div className="w-full max-w-6xl mx-auto my-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+      {activeTeams.map((team) => {
+        const { slots, totalCount, remainingSlots } = getTeamFullRoster(team.id, players);
+        const isPower =
+          String(team.id).toLowerCase().includes('alpha') ||
+          String(team.name || team.team_name || '').toLowerCase().includes('power');
+
+        return (
+          <div
+            key={team.id}
+            className={`p-3 rounded-2xl border backdrop-blur-md transition-all relative overflow-hidden
+              ${
+                isPower
+                  ? 'bg-gradient-to-r from-amber-950/40 via-surface-900/90 to-surface-900/80 border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                  : 'bg-gradient-to-r from-sky-950/40 via-surface-900/90 to-surface-900/80 border-sky-500/30 shadow-[0_0_20px_rgba(14,165,233,0.15)]'
+              }`}
+          >
+            {/* Header row */}
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    isPower ? 'bg-amber-400 animate-pulse' : 'bg-sky-400 animate-pulse'
+                  }`}
+                />
+                <div>
+                  <h4 className="font-rajdhani font-black text-sm sm:text-base text-white leading-tight uppercase">
+                    {getTeamDisplayName(team.id, team.name || team.team_name)}
+                  </h4>
+                  <p className="text-[10px] text-slate-400 font-inter">
+                    Owner: <span className="text-amber-300 font-bold">{getTeamOwner(team.id, team.owner_name || team.owner)}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="font-rajdhani font-black text-sm sm:text-base text-gold-400 tabular-nums">
+                  ₣{(team.fire_coin_balance ?? 0).toLocaleString()}
+                </span>
+                <span className="text-[9px] text-muted font-inter block leading-none">
+                  {totalCount}/4 Roster ({remainingSlots} open draft slot{remainingSlots !== 1 ? 's' : ''})
+                </span>
+              </div>
+            </div>
+
+            {/* 4 Slot Grid */}
+            <div className="grid grid-cols-4 gap-1.5">
+              {slots.map((p, idx) => {
+                const isCap = idx === 0;
+                if (!p) {
+                  return (
+                    <div
+                      key={`bcast-empty-${team.id}-${idx}`}
+                      className="p-1.5 rounded-xl border border-dashed border-white/10 bg-black/20 text-center flex flex-col items-center justify-center min-h-[52px]"
+                    >
+                      <span className="text-[9px] font-rajdhani font-bold text-slate-500 uppercase">
+                        Slot #{idx + 1}
+                      </span>
+                      <span className="text-[8px] text-slate-600 font-inter">Open</span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={`bcast-slot-${team.id}-${p.id || idx}`}
+                    className={`p-1.5 rounded-xl border flex flex-col items-center justify-between text-center min-h-[52px] relative overflow-hidden
+                      ${
+                        isCap
+                          ? 'bg-amber-500/15 border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)] ring-1 ring-amber-500/20'
+                          : 'bg-surface-800/80 border-surface-600/40'
+                      }`}
+                  >
+                    <span className="text-[10px] font-rajdhani font-black text-white truncate max-w-full leading-tight">
+                      {p.in_game_name || p.name}
+                    </span>
+                    {isCap ? (
+                      <span className="px-1.5 py-0.2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-black font-rajdhani font-black text-[8px] uppercase tracking-wider mt-0.5">
+                        👑 IGL · CAPTAIN
+                      </span>
+                    ) : (
+                      <span className="text-[8px] text-gold-400 font-inter font-bold tabular-nums mt-0.5">
+                        ₣{(p.current_bid ?? p.sold_price ?? 0).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  BroadcastOverlay Component
@@ -85,13 +192,13 @@ export default function BroadcastOverlay() {
       {/* ===================================================================== */}
       {/* 1. TOP FIXED TEAM WALLETS HUD (Thin height, minimalist, opacity-60)   */}
       {/* ===================================================================== */}
-      <nav className="fixed top-0 left-0 w-full z-40 px-6 py-2 bg-black/70 backdrop-blur-md border-b border-white/10 opacity-60 hover:opacity-100 transition-opacity duration-300">
+      <nav className="fixed top-0 left-0 w-full z-40 px-6 py-2 bg-black/70 backdrop-blur-md border-b border-white/10 opacity-70 hover:opacity-100 transition-opacity duration-300">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* Header Label */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="w-2 h-2 rounded-full bg-fire-500 animate-pulse" />
             <span className="text-[11px] font-rajdhani font-black tracking-[0.2em] text-white uppercase hidden sm:inline">
-              TEAMS & ROSTERS
+              HEAD-TO-HEAD AUCTION
             </span>
           </div>
 
@@ -100,14 +207,32 @@ export default function BroadcastOverlay() {
             {teams.map((t) => {
               const isBankrupt = (t.fire_coin_balance ?? 0) === 0;
               const isLow = !isBankrupt && (t.fire_coin_balance ?? 0) < 500;
-              const { totalCount, isFull } = getTeamFullRoster(t.id, players);
+              const { totalCount, isFull, isPendingTeam } = getTeamFullRoster(t.id, players);
+
+              if (isPendingTeam) {
+                return (
+                  <div
+                    key={t.id}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-900/60 border border-slate-700/30 opacity-40 flex-shrink-0"
+                    title="Franchise Closed / Inactive for this draft"
+                  >
+                    <span className="font-rajdhani font-bold text-xs text-slate-500 truncate max-w-[90px]">
+                      {getTeamDisplayName(t.id, t.name || t.team_name)}
+                    </span>
+                    <span className="text-[8px] font-rajdhani font-black text-slate-500 bg-slate-800 px-1 py-0.2 rounded uppercase">
+                      🔒 CLOSED
+                    </span>
+                  </div>
+                );
+              }
+
               return (
                 <div
                   key={t.id}
-                  className={`flex items-center gap-2 px-3 py-1 rounded-lg bg-surface-800/40 border border-surface-600/30 flex-shrink-0
+                  className={`flex items-center gap-2 px-3 py-1 rounded-lg bg-surface-800/60 border border-surface-600/40 flex-shrink-0
                     ${isBankrupt ? 'border-red-500/40 opacity-40' : isLow ? 'border-amber-500/40' : ''}`}
                 >
-                  <span className="font-rajdhani font-bold text-xs text-slate-300 truncate max-w-[110px]">
+                  <span className="font-rajdhani font-bold text-xs text-slate-200 truncate max-w-[110px]">
                     {getTeamDisplayName(t.id, t.name || t.team_name)}
                   </span>
                   <span
@@ -117,7 +242,7 @@ export default function BroadcastOverlay() {
                     ₣{(t.fire_coin_balance ?? 0).toLocaleString()}
                   </span>
                   <span className={`text-[9px] font-rajdhani font-bold px-1.5 py-0.2 rounded
-                    ${isFull ? 'bg-gold-500/20 text-gold-400' : 'bg-surface-700 text-slate-400'}`}>
+                    ${isFull ? 'bg-gold-500/20 text-gold-400' : 'bg-surface-700 text-slate-300'}`}>
                     {totalCount}/{MAX_ROSTER_SIZE}
                   </span>
                 </div>
@@ -242,6 +367,9 @@ export default function BroadcastOverlay() {
           )}
         </div>
       </main>
+
+      {/* ── DUAL FRANCHISE ROSTER SCOREBOARD ──────────────────────────────── */}
+      <BroadcastDualRosters teams={teams} players={players} />
 
       {/* Bottom spacer */}
       <footer className="w-full text-center text-[10px] font-inter text-slate-500 tracking-wider">

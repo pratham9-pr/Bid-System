@@ -226,10 +226,10 @@ function TeamRosterCard({ team, allPlayers, onAppoint }) {
 
   if (isPendingTeam) {
     return (
-      <div className="card-elevated p-6 opacity-60 border border-slate-700/50 bg-surface-900/40 relative overflow-hidden rounded-2xl">
+      <div className="card-elevated p-6 opacity-40 border border-slate-700/50 bg-surface-900/40 relative overflow-hidden rounded-2xl grayscale hover:grayscale-0 transition-all">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl overflow-hidden bg-black/40 border border-white/5 p-1 flex-shrink-0 grayscale">
+            <div className="w-10 h-10 rounded-xl overflow-hidden bg-black/40 border border-white/5 p-1 flex-shrink-0">
               <img src={teamLogo} alt="" className="w-full h-full object-contain opacity-40" />
             </div>
             <div>
@@ -237,16 +237,18 @@ function TeamRosterCard({ team, allPlayers, onAppoint }) {
                 <h3 className="font-rajdhani font-black text-lg text-slate-400">
                   {getTeamDisplayName(team.id, team.name || team.team_name)}
                 </h3>
-                <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 text-[9px] font-rajdhani font-black uppercase tracking-wider">
-                  🔒 Locked / Pending
+                <span className="px-2 py-0.5 rounded bg-red-950/60 text-red-400/90 border border-red-500/30 text-[9px] font-rajdhani font-black uppercase tracking-wider">
+                  🔒 CLOSED / INACTIVE FOR DRAFT
                 </span>
               </div>
               <p className="text-[10px] text-muted font-inter mt-0.5">
-                Franchise Pending · No captain or bidding required
+                Franchise Inactive · No captain or draft slots allocated
               </p>
             </div>
           </div>
-          <span className="text-xs font-rajdhani font-bold text-muted uppercase">Disabled</span>
+          <span className="text-xs font-rajdhani font-black text-slate-500 uppercase tracking-widest bg-black/40 px-2.5 py-1 rounded border border-white/5">
+            INACTIVE
+          </span>
         </div>
       </div>
     );
