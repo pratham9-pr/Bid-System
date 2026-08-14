@@ -44,12 +44,12 @@ function useAnimatedNumber(target, duration = 700) {
 
 // ─── Team Row ────────────────────────────────────────────────────────────────
 function TeamRow({ team, rank, players = [] }) {
-  const balance    = team.fire_coin_balance ?? 0;
+  const balance    = team?.fire_coin_balance ?? 0;
   const animated   = useAnimatedNumber(balance);
   const isBankrupt = balance === 0;
   const isWarning  = balance > 0 && balance < 500;
 
-  const { totalCount, isFull, remainingSlots } = getTeamFullRoster(team.id, players);
+  const { totalCount, isFull, remainingSlots } = getTeamFullRoster(team?.id, players);
 
   // State transitions tracked for subtle flash on balance drop
   const prevBalanceRef = useRef(balance);

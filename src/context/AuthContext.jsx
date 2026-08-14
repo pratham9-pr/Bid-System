@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../config/supabase';
 
 // ─── ASSIGNED FRANCHISE & HOST PASSWORDS ──────────────────────────────────────
 export const TEAM_CREDENTIALS = {
