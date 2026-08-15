@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { placeBid, MAX_BID_LIMIT, MIN_BASE_PRICE, computeMaxAllowedBid } from '../services/auctionService';
 import { useAllPlayers } from '../hooks/useAllPlayers';
 import { getTeamFullRoster, isTeamRosterFull, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
+import { getTeamDisplayName, getTeamOwner, getTeamLogo } from '../config/teamsConfig';
 
 // ─── SVG Ring Constants ──────────────────────────────────────────────────────
 const RING_SIZE       = 72;   // px — total SVG canvas size
@@ -367,6 +368,73 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
           </span>
         )}
       </div>
+
+      {/* ── LIVE HIGHEST BID & LEADER HUD ──────────────────────────────── */}
+      {activePlayer && isRevealed && (
+        <div className={`p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden
+          ${isSold
+            ? 'bg-gold-500/10 border-gold-500/40 shadow-[0_0_25px_rgba(245,158,11,0.2)]'
+            : activePlayer.current_highest_bidder && String(activePlayer.current_highest_bidder) === String(team?.id)
+              ? 'bg-gradient-to-br from-emerald-950/40 via-surface-900 to-surface-800 border-emerald-500/40 shadow-[0_0_25px_rgba(16,185,129,0.2)]'
+              : 'bg-gradient-to-br from-surface-800/90 via-surface-900 to-surface-800/90 border-fire-500/30 shadow-[0_0_20px_rgba(249,115,22,0.15)]'}`}
+        >
+          {/* Header Row */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-rajdhani font-black uppercase tracking-[0.2em] text-slate-400">
+              {isSold ? '🏆 WINNING BID' : '🔥 CURRENT HIGHEST BID'}
+            </span>
+            {activePlayer.current_highest_bidder && String(activePlayer.current_highest_bidder) === String(team?.id) && (
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[9px] font-rajdhani font-black uppercase tracking-wider animate-pulse flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                YOU ARE LEADING
+              </span>
+            )}
+          </div>
+
+          {/* Amount Display */}
+          <div className="flex items-baseline gap-2 mb-3">
+            <span className={`font-rajdhani font-black text-2xl ${isSold ? 'text-gold-400' : 'text-fire-400'}`}>₣</span>
+            <span className={`font-rajdhani font-black text-4xl tracking-tight tabular-nums ${isSold ? 'text-gradient-gold' : 'text-gradient-fire'}`}>
+              {Number(activePlayer.current_bid ?? activePlayer.base_price ?? 0).toLocaleString()}
+            </span>
+            <span className="text-xs text-slate-400 font-rajdhani font-bold ml-auto uppercase tracking-wider">
+              FC
+            </span>
+          </div>
+
+          {/* Leader Info Row with Mascot Logo */}
+          <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {/* Team Mascot Logo */}
+              <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-black/60 flex-shrink-0 flex items-center justify-center p-0.5 shadow-md">
+                <img
+                  src={getTeamLogo(activePlayer.current_highest_bidder)}
+                  alt="Team Logo"
+                  className="w-full h-full object-cover rounded-full"
+                  onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[9px] text-slate-400 uppercase font-rajdhani font-bold block leading-none">
+                  {isSold ? 'Acquired By' : 'Leading Franchise'}
+                </span>
+                <span className="text-sm font-rajdhani font-black text-white truncate block uppercase leading-tight mt-0.5">
+                  {activePlayer.current_highest_bidder
+                    ? (activePlayer.current_highest_bidder_name || getTeamDisplayName(activePlayer.current_highest_bidder))
+                    : 'Awaiting First Bid'}
+                </span>
+              </div>
+            </div>
+
+            {/* Base price reference if no bids */}
+            {!activePlayer.current_highest_bidder && (
+              <span className="text-[10px] text-amber-400/90 font-rajdhani font-bold whitespace-nowrap bg-amber-500/10 px-2 py-1 rounded-md border border-amber-500/20">
+                Base: ₣{Number(activePlayer.base_price ?? 0).toLocaleString()}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── ROSTER FULL BANNER ─────────────────────────────────────────── */}
       {isRosterFull && (

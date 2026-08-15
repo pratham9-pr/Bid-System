@@ -4,7 +4,7 @@ import { useAuctionRoom } from '../hooks/useAuctionRoom';
 import { useAllTeams } from '../hooks/useAllTeams';
 import { useAllPlayers } from '../hooks/useAllPlayers';
 import { PlayerRevealCard } from '../components/PlayerRevealCard';
-import { getTeamDisplayName, getTeamOwner, TEAMS_CONFIG } from '../config/teamsConfig';
+import { getTeamDisplayName, getTeamOwner, getTeamLogo, TEAMS_CONFIG } from '../config/teamsConfig';
 import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
 
 // ─── SOLD OUT Stamp Component ────────────────────────────────────────────────
@@ -320,39 +320,64 @@ export default function BroadcastOverlay() {
           {/* ── MASSIVE GLOWING BID COUNTER HUD BELOW CARD ────────────────── */}
           {activePlayer && isRevealed && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`w-full mt-4 p-4 rounded-2xl border text-center relative overflow-hidden backdrop-blur-md
+              key={`broadcast-bid-${activePlayer.id}-${activePlayer.current_bid ?? auctionState?.current_bid}`}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              className={`w-full mt-4 p-5 rounded-2xl border text-center relative overflow-hidden backdrop-blur-md
                 ${isSold
-                  ? 'bg-gold-500/10 border-gold-500/40 shadow-[0_0_30px_rgba(245,158,11,0.25)]'
-                  : 'bg-surface-900/90 border-fire-500/40 shadow-[0_0_30px_rgba(249,115,22,0.25)]'}`}
+                  ? 'bg-gold-500/10 border-gold-500/40 shadow-[0_0_35px_rgba(245,158,11,0.3)]'
+                  : 'bg-surface-900/95 border-fire-500/40 shadow-[0_0_35px_rgba(249,115,22,0.3)]'}`}
             >
-              <div className="flex items-center justify-between mb-1 text-[10px] font-rajdhani font-black uppercase tracking-[0.2em] text-slate-400">
-                <span>{isSold ? 'WINNING FINAL BID' : 'CURRENT HIGHEST BID'}</span>
+              <div className="flex items-center justify-between mb-1.5 text-[10px] font-rajdhani font-black uppercase tracking-[0.2em] text-slate-400">
+                <span>{isSold ? '🏆 FINAL WINNING BID' : '🔥 CURRENT HIGHEST BID'}</span>
                 <span className="text-amber-400 font-black">AUTO-SELL CAP: ₣40,000 FC</span>
               </div>
 
               {/* Massive Number */}
-              <div className="flex items-center justify-center gap-1.5 my-1">
+              <div className="flex items-center justify-center gap-2 my-1">
                 <span className={`font-rajdhani font-black text-3xl sm:text-4xl ${isSold ? 'text-gold-400' : 'text-fire-400'}`}>
                   ₣
                 </span>
                 <span
-                  className={`font-rajdhani font-black text-4xl sm:text-5xl tracking-tight tabular-nums
+                  className={`font-rajdhani font-black text-5xl sm:text-6xl tracking-tight tabular-nums
                     ${isSold ? 'text-gradient-gold drop-shadow-[0_0_25px_rgba(245,158,11,0.8)]' : 'text-gradient-fire drop-shadow-[0_0_25px_rgba(249,115,22,0.8)]'}`}
                 >
-                  {(activePlayer.current_bid ?? 0).toLocaleString()}
+                  {(activePlayer.current_bid ?? auctionState?.current_bid ?? activePlayer.base_price ?? 0).toLocaleString()}
                 </span>
               </div>
 
-              {/* Leading Team */}
-              <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between text-xs font-rajdhani font-bold">
-                <span className="text-muted uppercase tracking-wider">
-                  {isSold ? 'Acquired By:' : 'Leading Bidder:'}
-                </span>
-                <span className="text-white uppercase tracking-wide text-sm font-black">
-                  {activePlayer.current_highest_bidder_name || 'Awaiting First Bid'}
-                </span>
+              {/* Leading Team with Mascot Logo */}
+              <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-lg">
+                    <img
+                      src={getTeamLogo(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id)}
+                      alt="Leading Team Logo"
+                      className="w-full h-full object-cover rounded-full"
+                      onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                    />
+                  </div>
+                  <div className="text-left">
+                    <span className="text-[10px] text-slate-400 uppercase font-rajdhani font-bold block leading-none">
+                      {isSold ? 'Acquired By' : 'Leading Franchise'}
+                    </span>
+                    <span className="text-base sm:text-lg font-rajdhani font-black text-white uppercase tracking-wide leading-tight mt-0.5">
+                      {activePlayer.current_highest_bidder_name ||
+                       getTeamDisplayName(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id) ||
+                       'Awaiting First Bid'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="text-[9px] text-slate-400 font-inter uppercase tracking-wider block">
+                    Owner
+                  </span>
+                  <span className="text-xs sm:text-sm font-rajdhani font-bold text-amber-300 uppercase">
+                    {getTeamOwner(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id)}
+                  </span>
+                </div>
               </div>
             </motion.div>
           )}

@@ -19,6 +19,9 @@ export function useAuctionRoom(teamId) {
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState(null);
 
+  const activePlayerRef = useRef(activePlayer);
+  activePlayerRef.current = activePlayer;
+
   const activePlayerIdRef = useRef(activePlayerId);
   activePlayerIdRef.current = activePlayerId;
 
@@ -39,8 +42,16 @@ export function useAuctionRoom(teamId) {
       .maybeSingle();
 
     if (!error && data && !data.is_captain) {
-      setActivePlayer(data);
-    } else {
+      setActivePlayer((prev) => {
+        // If local state already has newer/same bid, preserve it
+        if (prev && String(prev.id) === cleanId && Number(prev.current_bid ?? 0) > Number(data.current_bid ?? 0)) {
+          return { ...data, ...prev };
+        }
+        return data;
+      });
+      setActivePlayerId(data.id);
+      activePlayerIdRef.current = data.id;
+    } else if (!data) {
       setActivePlayer(null);
     }
   };
@@ -79,7 +90,10 @@ export function useAuctionRoom(teamId) {
 
         if (isMounted && stateData) {
           setAuctionState(stateData);
-          setActivePlayerId(stateData.active_player_id || null);
+          if (stateData.active_player_id) {
+            setActivePlayerId(stateData.active_player_id);
+            activePlayerIdRef.current = stateData.active_player_id;
+          }
           const revealed = Boolean(
             stateData.is_revealed === true ||
             stateData.status === 'revealed' ||
@@ -106,6 +120,7 @@ export function useAuctionRoom(teamId) {
             if (activePlayers && activePlayers[0] && !activePlayers[0].is_captain) {
               setActivePlayer(activePlayers[0]);
               setActivePlayerId(activePlayers[0].id);
+              activePlayerIdRef.current = activePlayers[0].id;
             } else {
               setActivePlayer(null);
             }
@@ -139,11 +154,14 @@ export function useAuctionRoom(teamId) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'auction_state' },
-        (payload) => {
+        async (payload) => {
           const newState = payload.new;
           if (newState && isMounted) {
             setAuctionState(newState);
-            setActivePlayerId(newState.active_player_id || null);
+            if (newState.active_player_id) {
+              setActivePlayerId(newState.active_player_id);
+              activePlayerIdRef.current = newState.active_player_id;
+            }
             const revealed = Boolean(
               newState.is_revealed === true ||
               newState.status === 'revealed' ||
@@ -157,30 +175,51 @@ export function useAuctionRoom(teamId) {
             setIsRevealed(revealed);
             setBiddingOpen(bidding);
             setAuctionPaused(newState.status === 'paused' || newState.auction_paused === true);
-            if (newState.active_player_id) {
-              fetchPlayer(newState.active_player_id);
+
+            // If newState has live bid, immediately update activePlayer state
+            if (newState.current_bid != null) {
+              setActivePlayer((prev) => {
+                if (prev) {
+                  return {
+                    ...prev,
+                    current_bid: newState.current_bid,
+                    current_highest_bidder: newState.highest_bidder_team_id || prev.current_highest_bidder,
+                  };
+                }
+                return prev;
+              });
+            }
+
+            const targetId = newState.active_player_id || activePlayerIdRef.current;
+            if (targetId) {
+              await fetchPlayer(targetId);
             } else {
               setActivePlayer(null);
             }
           }
         }
       )
-      // Players updates
+      // Players updates (live bid changes)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'players' },
         (payload) => {
           const newPlayer = payload.new;
           if (newPlayer && isMounted) {
-            const currentTargetId = activePlayerIdRef.current;
-            if (
-              newPlayer.status === 'active' ||
-              (currentTargetId && String(newPlayer.id) === String(currentTargetId))
-            ) {
-              if (!newPlayer.is_captain) {
-                setActivePlayer(newPlayer);
-              } else {
-                setActivePlayer(null);
+            const currentTargetId = activePlayerIdRef.current || activePlayerRef.current?.id;
+            const matchesId = currentTargetId && String(newPlayer.id) === String(currentTargetId);
+            const isActiveStage = newPlayer.status === 'active' || newPlayer.status === 'revealed' || newPlayer.status === 'bidding' || newPlayer.status === 'sold';
+
+            if ((matchesId || isActiveStage) && !newPlayer.is_captain) {
+              setActivePlayer((prev) => {
+                if (!prev || String(prev.id) === String(newPlayer.id) || matchesId) {
+                  return { ...(prev || {}), ...newPlayer };
+                }
+                return prev;
+              });
+              if (newPlayer.id) {
+                setActivePlayerId(newPlayer.id);
+                activePlayerIdRef.current = newPlayer.id;
               }
             }
           }
@@ -205,10 +244,10 @@ export function useAuctionRoom(teamId) {
       )
       .subscribe();
 
-    // 3. Fallback polling every 2s to ensure 100% sync even if tab sleeps
+    // 3. Ultra-fast fallback polling (1 second) to guarantee 100% sync on broadcast overlays
     const pollInterval = setInterval(() => {
       if (isMounted) syncState();
-    }, 2000);
+    }, 1000);
 
     return () => {
       isMounted = false;
