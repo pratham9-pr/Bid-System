@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAllTeams } from '../hooks/useAllTeams';
 import { useAllPlayers } from '../hooks/useAllPlayers';
 import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';

@@ -17,12 +17,23 @@ export const MIN_BASE_PRICE      = 3000;  // Lowest possible player base price �
  * @returns {number} Maximum allowed bid amount (floored at 0)
  */
 export function computeMaxAllowedBid(remainingPurse, remainingEmptySlots) {
-  if (!remainingPurse || remainingPurse <= 0) return 0;
-  const slotsAfterThis = Math.max(0, (remainingEmptySlots || 1) - 1);
+  const purse = typeof remainingPurse === 'number' && !isNaN(remainingPurse) ? remainingPurse : 40000;
+  if (purse <= 0) return 0;
+
+  // If slots are undefined or <= 1, allow bidding up to full purse
+  const slots = typeof remainingEmptySlots === 'number' && !isNaN(remainingEmptySlots)
+    ? Math.max(1, remainingEmptySlots)
+    : 1;
+
+  const slotsAfterThis = Math.max(0, slots - 1);
   const reserved = MIN_BASE_PRICE * slotsAfterThis;
-  const maxAllowed = Math.max(0, remainingPurse - reserved);
-  // Also respect the global hard cap
-  return Math.min(maxAllowed, MAX_BID_LIMIT);
+  const maxAllowed = Math.max(0, purse - reserved);
+
+  // If maxAllowed is <= 0 (e.g. purse is very low), fall back to purse so user can at least bid what they have
+  const computed = maxAllowed > 0 ? maxAllowed : purse;
+  const finalCap = Math.min(computed, MAX_BID_LIMIT);
+
+  return isNaN(finalCap) || finalCap <= 0 ? Math.min(purse, MAX_BID_LIMIT) : finalCap;
 }
 
 // ─── Safe type helpers ────────────────────────────────────────────────────────
@@ -99,10 +110,17 @@ export async function placeBid(playerId, teamId, bidAmount) {
 }
 
 // ─── Safe auction_state updater ─────────────────────────────────────────────
-// Dynamically resolves singleton row ID (whether 1, 'current', or UUID)
+// Always uses the integer id=1 singleton row. Never passes string literals
+// like 'current' to integer columns — that causes: invalid input syntax for integer.
 async function safeUpdateAuctionState(payload) {
   try {
-    // 1. Get the existing row ID from auction_state
+    // Sanitize any numeric fields in the payload so they are always proper numbers,
+    // never strings or 'current', before sending to Postgres.
+    const safePayload = { ...payload };
+    if ('current_bid'   in safePayload) safePayload.current_bid   = safeNum(safePayload.current_bid, 0);
+    if ('max_bid_limit' in safePayload) safePayload.max_bid_limit = safeNum(safePayload.max_bid_limit, MAX_BID_LIMIT);
+
+    // 1. Discover the real singleton row ID (avoids hard-coding 1 if schema differs)
     const { data: existingRows } = await supabase
       .from('auction_state')
       .select('id')
@@ -111,32 +129,44 @@ async function safeUpdateAuctionState(payload) {
     const existingRow = existingRows && existingRows[0];
 
     if (!existingRow) {
-      // If table has no rows, create the row
+      // Row doesn't exist yet — create it with id=1 (integer, never 'current')
       const { data: inserted, error: insertErr } = await supabase
         .from('auction_state')
-        .insert({ id: 1, ...payload })
+        .insert({ id: 1, ...safePayload })
         .select()
         .maybeSingle();
 
       if (insertErr) {
-        await supabase.from('auction_state').insert({ id: 'current', ...payload });
+        // Insert failed (likely a concurrent race that already created the row).
+        // Fall back to upsert with id=1 — NEVER use string 'current'.
+        console.warn('auction_state insert race — falling back to upsert:', insertErr.message);
+        const { data: upserted, error: upsertErr } = await supabase
+          .from('auction_state')
+          .upsert({ id: 1, ...safePayload }, { onConflict: 'id' })
+          .select()
+          .maybeSingle();
+        return { data: upserted, error: upsertErr };
       }
       return { data: inserted, error: null };
     }
 
+    // 2. Row exists — update it using its actual id value (could be 1 or UUID)
     const rowId = existingRow.id;
 
-    // 2. Perform the update targeting the actual row ID
     let { data, error } = await supabase
       .from('auction_state')
-      .update(payload)
+      .update(safePayload)
       .eq('id', rowId)
       .select();
 
-    // 3. If schema cache column error, strip optional columns and retry
-    if (error && error.message && (error.message.includes('bidding_open') || error.message.includes('is_revealed') || error.message.includes('schema cache'))) {
-      console.warn('auction_state column missing, retrying with core columns:', error.message);
-      const cleanPayload = { ...payload };
+    // 3. If a schema-cache / missing-column error, strip optional columns and retry
+    if (error && error.message && (
+      error.message.includes('bidding_open') ||
+      error.message.includes('is_revealed') ||
+      error.message.includes('schema cache')
+    )) {
+      console.warn('auction_state column missing — retrying without optional fields:', error.message);
+      const cleanPayload = { ...safePayload };
       delete cleanPayload.bidding_open;
       delete cleanPayload.is_revealed;
       const retryRes = await supabase
@@ -144,7 +174,7 @@ async function safeUpdateAuctionState(payload) {
         .update(cleanPayload)
         .eq('id', rowId)
         .select();
-      data = retryRes.data;
+      data  = retryRes.data;
       error = retryRes.error;
     }
 

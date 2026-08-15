@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAllPlayers } from '../hooks/useAllPlayers';
-import { getTeamFullRoster, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
+import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
 import { computeMaxAllowedBid, DEFAULT_TEAM_PURSE, MIN_BASE_PRICE } from '../services/auctionService';
 import { getTeamDisplayName } from '../config/teamsConfig';
 
@@ -15,7 +15,7 @@ export function MyBalanceWidget({ team }) {
   const { players } = useAllPlayers();
   if (!team) return null;
 
-  const { captain, auctionedPlayers, slots = [null, null, null, null], totalCount, remainingSlots, isFull } = getTeamFullRoster(
+  const { captain, slots = [null, null, null, null], totalCount, remainingSlots, isFull } = getTeamFullRoster(
     team?.id,
     players
   );

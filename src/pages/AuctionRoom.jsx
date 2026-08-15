@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAuctionRoom } from '../hooks/useAuctionRoom';
-import { useAllPlayers } from '../hooks/useAllPlayers';
 import { ActivePlayerCard }   from '../components/ActivePlayerCard';
 import { BidPanel }           from '../components/BidPanel';
 import { MyBalanceWidget }    from '../components/MyBalanceWidget';
@@ -18,7 +17,6 @@ export default function AuctionRoom() {
   const effectiveTeam = team || (currentUser?.role === 'bidder' ? currentUser : null);
 
   const { activePlayer, team: liveTeam, auctionPaused, isRevealed, biddingOpen, loading, error } = useAuctionRoom(effectiveTeam?.id || effectiveTeam?.teamId);
-  const { players, auctionPlayers }  = useAllPlayers();
   const [notification, setNotification] = useState(null);
 
   const handleNotify  = useCallback((n) => setNotification(n), []);

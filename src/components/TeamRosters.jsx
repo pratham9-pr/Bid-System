@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { RoleBadge } from './RoleBadge';
-import { getTeamFullRoster, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
-import { appointTeamCaptain, removeTeamCaptain, removePlayerFromRoster, resetAllRostersAndCaptains, DEFAULT_TEAM_PURSE } from '../services/auctionService';
-import { getTeamLogo, getTeamDisplayName, getTeamOwner, TEAMS_CONFIG } from '../config/teamsConfig';
+import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
+import { appointTeamCaptain, removePlayerFromRoster, resetAllRostersAndCaptains, DEFAULT_TEAM_PURSE } from '../services/auctionService';
+import { getTeamLogo, getTeamDisplayName, getTeamOwner } from '../config/teamsConfig';
 
 // Team logo helper — uses central config so name/logo changes propagate everywhere
 const getTeamLogoUrl = (teamId) => getTeamLogo(teamId);
@@ -214,7 +214,7 @@ function BalanceBar({ balance, starting = DEFAULT_TEAM_PURSE }) {
 // ─── Individual team card ─────────────────────────────────────────────────────
 function TeamRosterCard({ team, allPlayers, onAppoint }) {
   const teamId = team.id;
-  const { captain, auctionedPlayers, slots, totalCount, remainingSlots, isFull, isPendingTeam } = getTeamFullRoster(
+  const { captain, auctionedPlayers, slots, totalCount, remainingSlots, isFull } = getTeamFullRoster(
     teamId,
     allPlayers
   );

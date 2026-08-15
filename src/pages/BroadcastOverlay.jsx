@@ -72,12 +72,11 @@ function BroadcastActiveRosters({ teams, players }) {
   return (
     <div className="w-full max-w-7xl mx-auto my-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       {allFranchises.map((team) => {
-        const { slots, totalCount, remainingSlots, isPendingTeam } = getTeamFullRoster(team.id, players);
+        const { slots } = getTeamFullRoster(team.id, players);
         const cleanName = String(team.name || team.team_name || team.id || '').toLowerCase();
         const isPower = cleanName.includes('alpha') || cleanName.includes('power');
         const isVortex = cleanName.includes('beta') || cleanName.includes('vortex');
         const isAbyssal = cleanName.includes('gamma') || cleanName.includes('abyssal') || cleanName.includes('ebon');
-        const isRxKudla = cleanName.includes('delta') || cleanName.includes('kudla') || cleanName.includes('rx');
 
         return (
           <div

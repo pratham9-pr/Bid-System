@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { placeBid, MAX_BID_LIMIT, MIN_BASE_PRICE, computeMaxAllowedBid } from '../services/auctionService';
+import { placeBid, MAX_BID_LIMIT, computeMaxAllowedBid } from '../services/auctionService';
 import { useAllPlayers } from '../hooks/useAllPlayers';
-import { getTeamFullRoster, isTeamRosterFull, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
-import { getTeamDisplayName, getTeamOwner, getTeamLogo } from '../config/teamsConfig';
+import { getTeamFullRoster } from '../config/franchiseCaptains';
+import { getTeamDisplayName, getTeamLogo } from '../config/teamsConfig';
 
 // ─── SVG Ring Constants ──────────────────────────────────────────────────────
 const RING_SIZE       = 72;   // px — total SVG canvas size
@@ -216,15 +216,20 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
   const { players } = useAllPlayers();
   const isSubmittingRef = useRef(false);
 
-  const teamBalance    = team?.fire_coin_balance ?? 0;
-  const currentBid     = activePlayer?.current_bid ?? 0;
+  const teamBalance    = typeof team?.fire_coin_balance === 'number' && !isNaN(team.fire_coin_balance)
+    ? team.fire_coin_balance
+    : 40000;
+  const currentBid     = Number(activePlayer?.current_bid ?? activePlayer?.base_price ?? 0);
 
   // ── Roster state ────────────────────────────────────────────────────────────
-  const { totalCount, remainingSlots, isFull: isRosterFull, captain } = getTeamFullRoster(team?.id, players);
+  const { totalCount = 0, remainingSlots = 3, isFull = false, captain } = getTeamFullRoster(team?.id, players);
+  const isRosterFull = Boolean(isFull || totalCount >= 4);
 
-  // ── Dynamic max bid (anti-soft-lock formula) ────────────────────────────────
+  // ── Dynamic max bid (anti-soft-lock formula with bulletproof fallback) ──────
   const dynamicMaxBid   = computeMaxAllowedBid(teamBalance, remainingSlots);
-  const effectiveMax    = dynamicMaxBid; // respects both formula and global cap
+  const effectiveMax    = typeof dynamicMaxBid === 'number' && !isNaN(dynamicMaxBid) && dynamicMaxBid > 0
+    ? dynamicMaxBid
+    : Math.min(teamBalance, MAX_BID_LIMIT);
 
   // ── Derived flags ────────────────────────────────────────────────────────────
   const isInsufficient  = Boolean(activePlayer && teamBalance < (currentBid + 1));

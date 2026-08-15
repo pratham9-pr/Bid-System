@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { supabase } from '../config/supabase';
 import {
   setPlayerActive,
   revealPlayer,
@@ -8,12 +7,10 @@ import {
   markUnsold,
   toggleAuctionPause,
   activateNextPlayer,
-  appointTeamCaptain,
-  removeTeamCaptain,
   manualSellToTeam,
 } from '../services/auctionService';
 import { RoleBadge } from './RoleBadge';
-import { TEAMS_CONFIG, getTeamDisplayName } from '../config/teamsConfig';
+import { getTeamDisplayName } from '../config/teamsConfig';
 
 // ─── Status dot ───────────────────────────────────────────────────────────────
 const StatusDot = ({ status, isCaptain }) => {
@@ -53,9 +50,6 @@ const SkipIcon = () => (
     <line x1="19" y1="5" x2="19" y2="19" strokeLinecap="round"/>
   </svg>
 );
-
-// Map config format for local use
-const TEAMS_LIST = TEAMS_CONFIG.map((t) => ({ id: t.id, name: t.name }));
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  PlayerControlCard — displays a single player with:

@@ -242,7 +242,7 @@ export function getTeamFullRoster(teamId, allPlayers = []) {
     for (const p of uniquePlayers) {
       if (!p) continue;
       const isSoldToThisTeam =
-        (p.status === 'sold' || p.status === 'active') &&
+        p.status === 'sold' &&
         (String(p.sold_to_team_id || '').toLowerCase() === cleanTeamId ||
           String(p.current_highest_bidder || '').toLowerCase() === cleanTeamId);
 
