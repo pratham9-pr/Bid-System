@@ -426,8 +426,8 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
                 </span>
                 <span className="text-sm font-rajdhani font-black text-white truncate block uppercase leading-tight mt-0.5">
                   {activePlayer.current_highest_bidder
-                    ? (activePlayer.current_highest_bidder_name || getTeamDisplayName(activePlayer.current_highest_bidder))
-                    : 'Awaiting First Bid'}
+                    ? getTeamDisplayName(activePlayer.current_highest_bidder, activePlayer.current_highest_bidder_name)
+                    : 'AWAITING FIRST BID'}
                 </span>
               </div>
             </div>

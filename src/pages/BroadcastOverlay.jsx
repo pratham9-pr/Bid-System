@@ -389,9 +389,9 @@ export default function BroadcastOverlay() {
                         {isSold ? 'Acquired By' : 'Leading Franchise'}
                       </span>
                       <span className="text-xs sm:text-sm font-rajdhani font-black text-white uppercase tracking-wide leading-tight truncate block mt-0.5">
-                        {activePlayer.current_highest_bidder_name ||
-                         getTeamDisplayName(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id) ||
-                         'Awaiting First Bid'}
+                        {activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id
+                          ? getTeamDisplayName(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id, activePlayer.current_highest_bidder_name)
+                          : 'AWAITING FIRST BID'}
                       </span>
                     </div>
                   </div>

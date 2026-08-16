@@ -5,7 +5,7 @@
 export const TEAMS_CONFIG = [
   {
     id: 'alpha_wolves',
-    aliases: ['alpha_wolves', 'team_alpha', 'alpha', '1', 'alpha wolves', 'power hawks', 'power_hawks'],
+    aliases: ['alpha_wolves', 'team_alpha', 'alpha', '1', 'alpha wolves', 'power hawks', 'power_hawks', 'powerhawks'],
     name: 'POWER HAWKS',
     owner: 'NX4 SILENT',
     shortName: 'PWR',
@@ -28,7 +28,7 @@ export const TEAMS_CONFIG = [
   {
     id: 'gamma_reapers',
     aliases: ['gamma_reapers', 'team_gamma', 'gamma', '3', 'gamma reapers', 'abyssal ebon', 'abyssal_ebon', 'abyssal', 'ebon'],
-    name: 'Abyssal Ebon',
+    name: 'ABYSSAL EBON',
     owner: 'invincible',
     shortName: 'ABY',
     logo: '/gamma-reapers.png',
@@ -49,20 +49,38 @@ export const TEAMS_CONFIG = [
   },
 ];
 
-/** Returns display name for a team ID or legacy name, with fallback */
+/** Returns display name for a team ID or legacy name, with guaranteed fallback */
 export function getTeamDisplayName(teamId, dbName = null) {
-  if (!teamId && !dbName) return 'Unknown Team';
   const cleanId = String(teamId || '').toLowerCase().trim();
   const cleanName = String(dbName || '').toLowerCase().trim();
+  if (!cleanId && !cleanName) return 'UNKNOWN TEAM';
 
+  // 1. Direct configuration lookup
   const config = TEAMS_CONFIG.find(
     (t) =>
       t.id === cleanId ||
       t.aliases?.includes(cleanId) ||
-      (cleanName && t.aliases?.includes(cleanName))
+      cleanId.includes(t.id) ||
+      (cleanName && (t.id === cleanName || t.aliases?.includes(cleanName) || cleanName.includes(t.id) || cleanName.includes(t.name.toLowerCase())))
   );
 
-  return config?.name || dbName || teamId || 'Unknown Team';
+  if (config) return config.name;
+
+  // 2. Pattern matching fallbacks to guaranteed 4 franchise names
+  if (cleanId.includes('alpha') || cleanId.includes('power') || cleanName.includes('alpha') || cleanName.includes('power')) {
+    return 'POWER HAWKS';
+  }
+  if (cleanId.includes('beta') || cleanId.includes('vortex') || cleanName.includes('beta') || cleanName.includes('vortex')) {
+    return 'TEAM VORTEX';
+  }
+  if (cleanId.includes('gamma') || cleanId.includes('abyssal') || cleanId.includes('ebon') || cleanName.includes('gamma') || cleanName.includes('abyssal') || cleanName.includes('ebon')) {
+    return 'ABYSSAL EBON';
+  }
+  if (cleanId.includes('delta') || cleanId.includes('kudla') || cleanId.includes('rx') || cleanName.includes('delta') || cleanName.includes('kudla') || cleanName.includes('rx')) {
+    return 'RX KUDLA';
+  }
+
+  return dbName || teamId || 'UNKNOWN TEAM';
 }
 
 /** Returns owner name for a team ID with fallback */
@@ -83,7 +101,7 @@ export function getTeamOwner(teamId, dbOwner = null) {
     return config.owner;
   }
 
-  return config?.owner || dbOwner || 'Pending';
+  return config?.owner || dbOwner || 'PENDING';
 }
 
 /** Returns team config object for a given ID or alias */
@@ -96,5 +114,5 @@ export function getTeamConfig(teamId) {
 /** Returns the team logo path */
 export function getTeamLogo(teamId) {
   const config = getTeamConfig(teamId);
-  return config?.logo || '/logo.png';
+  return config?.logo || '/demons_reign_logo.jpg';
 }

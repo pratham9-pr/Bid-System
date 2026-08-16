@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase';
+import { getTeamDisplayName } from '../config/teamsConfig';
 
 // ─── GLOBAL AUCTION CONSTRAINTS ───────────────────────────────────────────────
 export const MAX_BID_LIMIT       = 30000; // 30,000 FC global auto-sell cap (hard ceiling)
@@ -171,7 +172,7 @@ export async function placeBid(playerId, teamId, bidAmount) {
       return { success: false, error: `Insufficient Fire Coins! Balance: ₣${teamBalance.toLocaleString()}` };
     }
 
-    const teamDisplayName = teamData.team_name || teamData.name || cleanTeamId;
+    const teamDisplayName = getTeamDisplayName(cleanTeamId, teamData.team_name || teamData.name);
     const isAutoSold = numericBid >= MAX_BID_LIMIT || numericBid >= (player.max_limit || MAX_BID_LIMIT);
 
     if (isAutoSold) {
@@ -969,7 +970,7 @@ export async function resetAllRostersAndCaptains() {
     }).or('id.eq.beta_strikers,id.eq.TEAM_BETA');
 
     await supabase.from('teams').update({
-      team_name:         'Abyssal Ebon',
+      team_name:         'ABYSSAL EBON',
       owner_name:        'invincible',
       fire_coin_balance: DEFAULT_TEAM_PURSE,
       last_bid_time:     null,
@@ -1066,7 +1067,7 @@ export async function hardResetDatabase() {
     const teamConfigs = [
       { id: 'alpha_wolves',   name: 'POWER HAWKS',   owner: 'NX4 SILENT',   alt: 'TEAM_ALPHA' },
       { id: 'beta_strikers',  name: 'TEAM VORTEX',   owner: 'MOKSHII FF',   alt: 'TEAM_BETA' },
-      { id: 'gamma_reapers',  name: 'Abyssal Ebon',  owner: 'invincible',   alt: 'TEAM_GAMMA' },
+      { id: 'gamma_reapers',  name: 'ABYSSAL EBON',  owner: 'invincible',   alt: 'TEAM_GAMMA' },
       { id: 'delta_phantoms', name: 'RX KUDLA',      owner: 'RX KAUSHII',   alt: 'TEAM_DELTA' },
     ];
 

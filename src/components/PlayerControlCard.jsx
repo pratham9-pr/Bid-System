@@ -172,7 +172,7 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
 
             {player.current_highest_bidder && (
               <div className="text-[10px] font-inter mt-0.5">
-                <span className="text-gold-400 font-semibold">{player.current_highest_bidder_name}</span>
+                <span className="text-gold-400 font-semibold">{getTeamDisplayName(player.current_highest_bidder, player.current_highest_bidder_name)}</span>
                 {isCaptain ? (
                   <span className="text-amber-400 font-rajdhani font-bold"> · 🔒 Locked Captain</span>
                 ) : (

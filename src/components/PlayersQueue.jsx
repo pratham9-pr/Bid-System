@@ -1,5 +1,6 @@
 import React from 'react';
 import { RoleBadge } from './RoleBadge';
+import { getTeamDisplayName } from '../config/teamsConfig';
 
 const StatusBadge = ({ status }) => {
   if (status === 'active')   return <span className="badge-active">● Live</span>;
@@ -119,10 +120,10 @@ export function PlayersQueue({ players, activePlayerId }) {
             {sold.map((p) => (
               <div key={p.id}>
                 <PlayerRow player={p} />
-                {p.current_highest_bidder_name && (
+                {(p.current_highest_bidder || p.current_highest_bidder_name) && (
                   <div className="px-2.5 pb-1.5 -mt-0.5">
                     <span className="text-[10px] text-gold-500/70 font-inter">
-                      → {p.current_highest_bidder_name} · ₣{(p.current_bid || p.sold_price || 0).toLocaleString()}
+                      → {getTeamDisplayName(p.current_highest_bidder || p.sold_to_team_id, p.current_highest_bidder_name)} · ₣{(p.current_bid || p.sold_price || 0).toLocaleString()}
                     </span>
                   </div>
                 )}
