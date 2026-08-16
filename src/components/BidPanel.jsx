@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { placeBid, MAX_BID_LIMIT, computeMaxAllowedBid } from '../services/auctionService';
+import { placeBid, MAX_BID_LIMIT, MIN_BASE_PRICE, computeMaxAllowedBid } from '../services/auctionService';
 import { useAllPlayers } from '../hooks/useAllPlayers';
 import { getTeamFullRoster } from '../config/franchiseCaptains';
 import { getTeamDisplayName, getTeamLogo } from '../config/teamsConfig';
@@ -306,7 +306,8 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
     isSubmittingRef.current = true;
     setIsLoading(true);
     try {
-      const result = await placeBid(activePlayer.id, team.id, amount);
+      console.log('Current Active Player ID:', activePlayer?.id);
+      const result = await placeBid(activePlayer?.id, team.id, amount);
 
       if (result.success) {
         if (result.auto_sold) {

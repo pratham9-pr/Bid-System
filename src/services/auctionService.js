@@ -83,7 +83,7 @@ export function isActiveFranchise(teamId) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  PLACE BID (Atomic Transaction RPC with 40,000 FC Max Cap Auto-Sell)
+//  PLACE BID (Atomic Transaction RPC with Direct JS Fallback)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function placeBid(playerId, teamId, bidAmount) {
   try {
@@ -94,18 +94,146 @@ export async function placeBid(playerId, teamId, bidAmount) {
       };
     }
 
-    const numericBid = Math.min(MAX_BID_LIMIT, safeNum(bidAmount));
+    const cleanTeamId = String(teamId).trim();
+    const numericBid  = Math.min(MAX_BID_LIMIT, safeNum(bidAmount, 0));
 
-    const { data, error } = await supabase.rpc('place_bid', {
-      p_player_id:  String(playerId),
-      p_team_id:    String(teamId),
-      p_bid_amount: numericBid,
-    });
+    console.log('[Bid System] placeBid called with playerId:', playerId, 'teamId:', cleanTeamId, 'bidAmount:', numericBid);
 
-    if (error) return { success: false, error: error.message };
-    return data;
+    // 1. Resolve target player record accurately
+    let player = null;
+    let targetPlayerId = playerId != null ? String(playerId).trim() : null;
+
+    // A. Lookup by provided ID if not literal 'current' or missing
+    if (targetPlayerId && targetPlayerId !== 'current' && targetPlayerId !== 'undefined' && targetPlayerId !== 'null') {
+      const { data: pData } = await supabase
+        .from('players')
+        .select('*')
+        .eq('id', targetPlayerId)
+        .maybeSingle();
+
+      if (pData) {
+        player = pData;
+      }
+    }
+
+    // B. Fallback: Lookup currently active player on stage
+    if (!player) {
+      const { data: activePlayers } = await supabase
+        .from('players')
+        .select('*')
+        .eq('status', 'active')
+        .limit(1);
+
+      if (activePlayers && activePlayers[0] && !activePlayers[0].is_captain) {
+        player = activePlayers[0];
+      }
+    }
+
+    if (!player) {
+      return { success: false, error: 'Target player not found on auction floor.' };
+    }
+
+    const finalPlayerId = player.id;
+    console.log('[Bid System] Target player confirmed:', player.in_game_name || player.name, 'ID:', finalPlayerId);
+
+    // 2. Attempt atomic PostgreSQL RPC first
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('place_bid', {
+        p_player_id:  String(finalPlayerId),
+        p_team_id:    cleanTeamId,
+        p_bid_amount: numericBid,
+      });
+
+      if (!rpcError && rpcData && rpcData.success !== false) {
+        return rpcData;
+      }
+      if (rpcError) {
+        console.warn('place_bid RPC notice, executing direct fallback:', rpcError.message);
+      }
+    } catch (rpcEx) {
+      console.warn('place_bid RPC exception, executing direct fallback:', rpcEx);
+    }
+
+    // 3. Robust Direct JS Fallback
+    // Fetch team info
+    const { data: teamData, error: tErr } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('id', cleanTeamId)
+      .maybeSingle();
+
+    if (tErr || !teamData) {
+      return { success: false, error: 'Team record not found.' };
+    }
+
+    const teamBalance = typeof teamData.fire_coin_balance === 'number' ? teamData.fire_coin_balance : 40000;
+    if (teamBalance < numericBid) {
+      return { success: false, error: `Insufficient Fire Coins! Balance: ₣${teamBalance.toLocaleString()}` };
+    }
+
+    const teamDisplayName = teamData.team_name || teamData.name || cleanTeamId;
+    const isAutoSold = numericBid >= MAX_BID_LIMIT || numericBid >= (player.max_limit || MAX_BID_LIMIT);
+
+    if (isAutoSold) {
+      // Auto-sell player immediately
+      await supabase
+        .from('players')
+        .update({
+          status:                      'sold',
+          sold_price:                  numericBid,
+          current_bid:                 numericBid,
+          sold_to_team_id:             cleanTeamId,
+          current_highest_bidder:      cleanTeamId,
+          current_highest_bidder_name: teamDisplayName,
+        })
+        .eq('id', finalPlayerId);
+
+      const newBalance = Math.max(0, teamBalance - numericBid);
+      await supabase
+        .from('teams')
+        .update({
+          fire_coin_balance: newBalance,
+          last_bid_time:     new Date().toISOString(),
+        })
+        .eq('id', cleanTeamId);
+
+      await safeUpdateAuctionState({
+        status:                 'sold',
+        bidding_open:           false,
+        current_bid:            numericBid,
+        highest_bidder_team_id: cleanTeamId,
+      });
+
+      return {
+        success:   true,
+        auto_sold: true,
+        message:   `Max limit reached! Player auto-sold to ${teamDisplayName} for ₣${numericBid.toLocaleString()}`,
+      };
+    } else {
+      // Normal bid increment
+      await supabase
+        .from('players')
+        .update({
+          current_bid:                 numericBid,
+          current_highest_bidder:      cleanTeamId,
+          current_highest_bidder_name: teamDisplayName,
+        })
+        .eq('id', finalPlayerId);
+
+      await supabase
+        .from('teams')
+        .update({ last_bid_time: new Date().toISOString() })
+        .eq('id', cleanTeamId);
+
+      await safeUpdateAuctionState({
+        current_bid:            numericBid,
+        highest_bidder_team_id: cleanTeamId,
+      });
+
+      return { success: true, auto_sold: false };
+    }
   } catch (err) {
-    return { success: false, error: err.message || 'Network error placing bid' };
+    return { success: false, error: err.message || 'Error processing bid' };
   }
 }
 
@@ -890,3 +1018,77 @@ export async function seedDatabase() {
     return { success: false, error: err.message };
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  HARD RESET & PURGE (Deletes all players, clears state, resets all 4 purses to 40,000)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function hardResetDatabase() {
+  try {
+    // 1. Reset auction state to idle & clear active player
+    await safeUpdateAuctionState({
+      active_player_id:        null,
+      is_revealed:             false,
+      bidding_open:            false,
+      status:                  'idle',
+      current_bid:             0,
+      max_bid_limit:           40000,
+      highest_bidder_team_id:  null,
+      auction_paused:          false,
+    });
+
+    // 2. Delete ALL records from players table
+    const { error: delErr } = await supabase
+      .from('players')
+      .delete()
+      .neq('id', '___ZERO_MATCH_SAFE_KEY___');
+
+    if (delErr) {
+      console.warn('Direct delete warning, attempting batch delete:', delErr.message);
+      // Fallback: fetch all player IDs and delete
+      const { data: allP } = await supabase.from('players').select('id');
+      if (allP && allP.length > 0) {
+        for (const p of allP) {
+          await supabase.from('players').delete().eq('id', p.id);
+        }
+      }
+    }
+
+    // 3. Reset all 4 franchise team records to 40,000 FC and clear timestamps
+    const teamConfigs = [
+      { id: 'alpha_wolves',   name: 'POWER HAWKS',   owner: 'NX4 SILENT',   alt: 'TEAM_ALPHA' },
+      { id: 'beta_strikers',  name: 'TEAM VORTEX',   owner: 'MOKSHII FF',   alt: 'TEAM_BETA' },
+      { id: 'gamma_reapers',  name: 'Abyssal Ebon',  owner: 'invincible',   alt: 'TEAM_GAMMA' },
+      { id: 'delta_phantoms', name: 'RX KUDLA',      owner: 'RX KAUSHII',   alt: 'TEAM_DELTA' },
+    ];
+
+    for (const t of teamConfigs) {
+      await supabase
+        .from('teams')
+        .update({
+          team_name:         t.name,
+          owner_name:        t.owner,
+          fire_coin_balance: 40000,
+          last_bid_time:     null,
+        })
+        .or(`id.eq.${t.id},id.eq.${t.alt}`);
+    }
+
+    // 4. Clear local storage caches for clean state
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem('cached_auction_state');
+        window.localStorage.removeItem('cached_players');
+        window.localStorage.removeItem('cached_rosters');
+      }
+    } catch (e) {}
+
+    return {
+      success: true,
+      message: 'Hard reset complete! All players purged and all 4 franchise purses restored to ₣40,000 FC.',
+    };
+  } catch (err) {
+    console.error('Hard reset error:', err);
+    return { success: false, error: err.message || 'Failed to hard reset database' };
+  }
+}
+

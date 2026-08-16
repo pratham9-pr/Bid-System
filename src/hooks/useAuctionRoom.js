@@ -34,17 +34,32 @@ export function useAuctionRoom(teamId) {
       setActivePlayer(null);
       return;
     }
-    const cleanId = String(id);
-    const { data, error } = await supabase
-      .from('players')
-      .select('*')
-      .eq('id', cleanId)
-      .maybeSingle();
+    const cleanId = String(id).trim();
+    let data = null;
 
-    if (!error && data && !data.is_captain) {
+    if (cleanId && cleanId !== 'current' && cleanId !== 'undefined' && cleanId !== 'null') {
+      const { data: pData } = await supabase
+        .from('players')
+        .select('*')
+        .eq('id', cleanId)
+        .maybeSingle();
+      data = pData;
+    }
+
+    if (!data) {
+      const { data: actData } = await supabase
+        .from('players')
+        .select('*')
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+      data = actData;
+    }
+
+    if (data && !data.is_captain) {
       setActivePlayer((prev) => {
         // If local state already has newer/same bid, preserve it
-        if (prev && String(prev.id) === cleanId && Number(prev.current_bid ?? 0) > Number(data.current_bid ?? 0)) {
+        if (prev && String(prev.id) === String(data.id) && Number(prev.current_bid ?? 0) > Number(data.current_bid ?? 0)) {
           return { ...data, ...prev };
         }
         return data;

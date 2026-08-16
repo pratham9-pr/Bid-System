@@ -10,7 +10,7 @@ import {
   manualSellToTeam,
 } from '../services/auctionService';
 import { RoleBadge } from './RoleBadge';
-import { getTeamDisplayName } from '../config/teamsConfig';
+import { TEAMS_CONFIG, getTeamDisplayName } from '../config/teamsConfig';
 
 // ─── Status dot ───────────────────────────────────────────────────────────────
 const StatusDot = ({ status, isCaptain }) => {

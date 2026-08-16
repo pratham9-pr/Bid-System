@@ -9,7 +9,7 @@ import { TeamLeaderboard } from '../components/TeamLeaderboard';
 import { AddPlayerForm } from '../components/AddPlayerForm';
 import { TeamRosters } from '../components/TeamRosters';
 import { getTeamDisplayName, TEAMS_CONFIG } from '../config/teamsConfig';
-import { seedDatabase, revealPlayer, hidePlayer, startBidding, closeBidding, manualSellToTeam } from '../services/auctionService';
+import { seedDatabase, hardResetDatabase, revealPlayer, hidePlayer, startBidding, closeBidding, manualSellToTeam } from '../services/auctionService';
 
 export default function AdminPanel() {
   const navigate  = useNavigate();
@@ -22,6 +22,7 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState('Players');
   const [seedMsg,   setSeedMsg]   = useState('');
   const [seeding,   setSeeding]   = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [revealing, setRevealing] = useState(false);
   // Manual Sell state
   const [sellTeamId, setSellTeamId] = useState('');
@@ -39,6 +40,19 @@ export default function AdminPanel() {
     setSeedMsg(result.success ? `✓ ${result.message}` : `✗ ${result.error}`);
     setSeeding(false);
     setTimeout(() => setSeedMsg(''), 4000);
+  };
+
+  const handleHardReset = async () => {
+    const confirmed = window.confirm(
+      '⚠️ WARNING: HARD RESET & PURGE!\n\nThis will:\n1. Delete ALL players from the database\n2. Clear all team rosters & captain assignments\n3. Restore all 4 franchise purses to ₣40,000 FC\n4. Reset global auction state to idle\n\nAre you sure you want to proceed?'
+    );
+    if (!confirmed) return;
+
+    setResetting(true);
+    const result = await hardResetDatabase();
+    setSeedMsg(result.success ? `✓ ${result.message}` : `✗ ${result.error}`);
+    setResetting(false);
+    setTimeout(() => setSeedMsg(''), 5000);
   };
 
   const statusOrder = { active: 0, upcoming: 1, sold: 2, unsold: 3 };
@@ -87,14 +101,26 @@ export default function AdminPanel() {
             📺 Stream Overlay
           </button>
           {isAdmin && (
-            <button
-              id="admin-seed-btn"
-              onClick={handleSeed}
-              disabled={seeding}
-              className="btn-ghost text-xs px-3 py-2"
-            >
-              {seeding ? 'Seeding…' : '⚡ Seed Data'}
-            </button>
+            <>
+              <button
+                id="admin-seed-btn"
+                onClick={handleSeed}
+                disabled={seeding || resetting}
+                className="btn-ghost text-xs px-3 py-2"
+                title="Resets rosters to starting state and seeds initial players"
+              >
+                {seeding ? 'Seeding…' : '⚡ Seed Data'}
+              </button>
+              <button
+                id="admin-hard-reset-btn"
+                onClick={handleHardReset}
+                disabled={resetting || seeding}
+                className="text-xs px-3 py-2 rounded-lg font-rajdhani font-bold uppercase tracking-wider bg-red-950/40 text-red-400 border border-red-500/30 hover:bg-red-900/50 hover:border-red-500/60 hover:text-red-300 transition-all duration-150 disabled:opacity-40"
+                title="Completely delete all players, clear all rosters & reset all 4 franchise purses to 40,000 FC"
+              >
+                {resetting ? 'Purging…' : '🧨 Hard Reset'}
+              </button>
+            </>
           )}
           {firebaseUser ? (
             <button

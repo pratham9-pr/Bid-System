@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { RoleBadge } from './RoleBadge';
-import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
+import { getTeamFullRoster, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
 import { appointTeamCaptain, removePlayerFromRoster, resetAllRostersAndCaptains, DEFAULT_TEAM_PURSE } from '../services/auctionService';
 import { getTeamLogo, getTeamDisplayName, getTeamOwner } from '../config/teamsConfig';
 
@@ -380,7 +380,7 @@ export function TeamRosters({ teams, players, loading, onAppoint }) {
 
   const totalDrafted  = soldPlayers.length;
   const totalRosterPlayers = activeCaptainsCount + totalDrafted;
-  const totalAvailableAuctionSlots = Math.max(0, (teams.length * MAX_AUCTION_SLOTS) - totalDrafted);
+  const totalAvailableAuctionSlots = Math.max(0, (teams.length * MAX_ROSTER_SIZE) - totalRosterPlayers);
   const totalCoinsSpent = soldPlayers.reduce((s, p) => s + (p.current_bid ?? p.sold_price ?? 0), 0);
 
   return (
@@ -421,8 +421,8 @@ export function TeamRosters({ teams, players, loading, onAppoint }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: 'Total Lineup Slots',    value: `${totalRosterPlayers} / ${teams.length * MAX_ROSTER_SIZE}`, color: 'text-white' },
-          { label: 'Franchise Captains',    value: `${activeCaptainsCount} Appointed (IGL)`,                   color: 'text-amber-400' },
-          { label: 'Auction Draft Slots',   value: `${totalDrafted} / ${teams.length * MAX_AUCTION_SLOTS} (${totalAvailableAuctionSlots} Open)`, color: 'text-gold-400' },
+          { label: 'Franchise Captains',    value: `${activeCaptainsCount} Appointed`,                   color: 'text-amber-400' },
+          { label: 'Auction Draft Slots',   value: `${totalDrafted} / ${teams.length * MAX_ROSTER_SIZE} (${totalAvailableAuctionSlots} Open)`, color: 'text-gold-400' },
           { label: 'Total Coins Spent',     value: `₣${totalCoinsSpent.toLocaleString()}`,                     color: 'text-fire-400' },
         ].map(({ label, value, color }) => (
           <div key={label} className="card px-4 py-3 flex flex-col gap-0.5 border border-surface-600/40">

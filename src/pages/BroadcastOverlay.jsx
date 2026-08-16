@@ -72,7 +72,7 @@ function BroadcastActiveRosters({ teams, players }) {
   return (
     <div className="w-full max-w-7xl mx-auto my-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       {allFranchises.map((team) => {
-        const { slots } = getTeamFullRoster(team.id, players);
+        const { slots, totalCount = 0, remainingSlots = 4 } = getTeamFullRoster(team.id, players);
         const cleanName = String(team.name || team.team_name || team.id || '').toLowerCase();
         const isPower = cleanName.includes('alpha') || cleanName.includes('power');
         const isVortex = cleanName.includes('beta') || cleanName.includes('vortex');

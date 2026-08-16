@@ -178,57 +178,37 @@ export function getTeamFullRoster(teamId, allPlayers = []) {
   }
   const uniquePlayers = Array.from(uniquePlayersMap.values());
 
-  // 1. Resolve Captain: Permanent hardcoded captain + any DB photo/details attached
+  // 1. Resolve Captain: Strictly derive from active database records
   const baseCaptain = getCaptainForTeam(cleanTeamId);
   let captain = null;
 
-  if (baseCaptain) {
-    // Look for matching DB player row if exists to inherit photo/custom card
-    const dbMatch = uniquePlayers.find((p) => {
-      const pName = (p.in_game_name || p.name || '').toLowerCase().trim();
-      const capName = baseCaptain.name.toLowerCase().trim();
-      const capInGame = (baseCaptain.in_game_name || '').toLowerCase().trim();
-      return (
-        pName === capName ||
-        pName === capInGame ||
-        (capName.includes('kaush') && pName.includes('kaush')) ||
-        p.id === baseCaptain.id ||
-        (p.is_captain && (String(p.sold_to_team_id).toLowerCase() === cleanTeamId || String(p.current_highest_bidder).toLowerCase() === cleanTeamId))
-      );
-    });
+  // Search in database players for this franchise's captain
+  const dbMatch = uniquePlayers.find((p) => {
+    if (!p) return false;
+    const pName = (p.in_game_name || p.name || '').toLowerCase().trim();
+    const capName = baseCaptain?.name?.toLowerCase().trim();
+    const capInGame = (baseCaptain?.in_game_name || '').toLowerCase().trim();
+    const isMatchingName = (capName && pName === capName) || (capInGame && pName === capInGame) || (p.id === baseCaptain?.id);
+    const isAssignedToThisTeam =
+      String(p.sold_to_team_id || '').toLowerCase() === cleanTeamId ||
+      String(p.current_highest_bidder || '').toLowerCase() === cleanTeamId;
 
+    return (p.is_captain === true && isAssignedToThisTeam) || (isMatchingName && isAssignedToThisTeam);
+  });
+
+  if (dbMatch) {
     captain = {
-      ...baseCaptain,
-      ...(dbMatch
-        ? {
-            id: dbMatch.id,
-            photo_url: dbMatch.photo_url || dbMatch.custom_card_url || baseCaptain.photo_url,
-            custom_card_url: dbMatch.custom_card_url || null,
-            image_url: dbMatch.image_url || null,
-          }
-        : {}),
+      ...(baseCaptain || {}),
+      ...dbMatch,
+      id: dbMatch.id,
+      photo_url: dbMatch.photo_url || dbMatch.custom_card_url || baseCaptain?.photo_url,
+      custom_card_url: dbMatch.custom_card_url || null,
+      image_url: dbMatch.image_url || null,
       is_captain: true,
       is_locked: true,
       role: 'IGL',
       status: 'captain',
     };
-  } else {
-    // Fallback: look in database players for an appointed captain for this team
-    const dbCaptain = uniquePlayers.find(
-      (p) =>
-        (p.is_captain === true || isPermanentCaptainName(p.in_game_name || p.name)) &&
-        (String(p.sold_to_team_id || '').toLowerCase() === cleanTeamId ||
-          String(p.current_highest_bidder || '').toLowerCase() === cleanTeamId)
-    );
-    if (dbCaptain) {
-      captain = {
-        ...dbCaptain,
-        is_captain: true,
-        is_locked: true,
-        role: 'IGL',
-        status: 'captain',
-      };
-    }
   }
 
   const captainId = captain?.id ? String(captain.id) : null;
