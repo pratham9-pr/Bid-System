@@ -14,7 +14,7 @@ SET active_player_id        = NULL,
     bidding_open            = FALSE,
     auction_paused          = FALSE,
     current_bid             = 0,
-    max_bid_limit           = 40000,
+    max_bid_limit           = 30000,
     highest_bidder_team_id  = NULL,
     updated_at              = NOW()
 WHERE id IS NOT NULL;

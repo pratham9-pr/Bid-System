@@ -18,4 +18,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+console.info('[Supabase] Initialized client for:', supabaseUrl);
+
 export default supabase;

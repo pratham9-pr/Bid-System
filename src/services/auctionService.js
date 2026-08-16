@@ -1,7 +1,7 @@
 import { supabase } from '../config/supabase';
 
 // ─── GLOBAL AUCTION CONSTRAINTS ───────────────────────────────────────────────
-export const MAX_BID_LIMIT       = 40000; // 40,000 FC global auto-sell cap (hard ceiling)
+export const MAX_BID_LIMIT       = 30000; // 30,000 FC global auto-sell cap (hard ceiling)
 export const DEFAULT_TEAM_PURSE  = 40000; // 40,000 FC starting team purse
 export const MIN_BASE_PRICE      = 3000;  // Lowest possible player base price — used in max-bid formula
 
@@ -717,16 +717,25 @@ export async function addPlayer({
       status:                      'upcoming',
     };
 
-    const { data, error } = await supabase
-      .from('players')
-      .insert(payload)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('players')
+        .insert(payload)
+        .select()
+        .single();
 
-    if (error) return { success: false, error: error.message };
-    return { success: true, playerId: data.id };
+      if (error) {
+        console.error('Detailed Fetch Error:', error);
+        return { success: false, error: error.message || 'Database insert error' };
+      }
+      return { success: true, playerId: data.id };
+    } catch (insertError) {
+      console.error('Detailed Fetch Error:', insertError);
+      return { success: false, error: insertError.message || 'Failed to fetch / network error during insert' };
+    }
   } catch (err) {
-    return { success: false, error: err.message };
+    console.error('Detailed Fetch Error:', err);
+    return { success: false, error: err.message || 'Failed to add player' };
   }
 }
 
@@ -1031,7 +1040,7 @@ export async function hardResetDatabase() {
       bidding_open:            false,
       status:                  'idle',
       current_bid:             0,
-      max_bid_limit:           40000,
+      max_bid_limit:           30000,
       highest_bidder_team_id:  null,
       auction_paused:          false,
     });

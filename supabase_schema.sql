@@ -168,10 +168,10 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'Insufficient Fire Coins. Balance: ₣' || v_team.fire_coin_balance);
     END IF;
 
-    -- 4. Auto-sell if bid >= max_limit OR bid >= 40000 (Global Max Cap)
-    IF p_bid_amount >= v_player.max_limit OR p_bid_amount >= 40000 THEN
-        IF p_bid_amount > 40000 THEN
-            p_bid_amount := 40000;
+    -- 4. Auto-sell if bid >= max_limit OR bid >= 30000 (Global Max Cap)
+    IF p_bid_amount >= v_player.max_limit OR p_bid_amount >= 30000 THEN
+        IF p_bid_amount > 30000 THEN
+            p_bid_amount := 30000;
         END IF;
 
         -- Mark as sold and deduct balance immediately

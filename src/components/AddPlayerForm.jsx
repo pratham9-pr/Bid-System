@@ -107,39 +107,46 @@ export function AddPlayerForm({ onSuccess }) {
     if (Object.keys(errs).length > 0) return;
 
     setLoading(true);
-    const result = await addPlayer({
-      name:             name.trim(),
-      in_game_name:     name.trim(),
-      base_price:       Number(basePrice),
-      max_limit:        Number(maxLimit),
-      role,
-      photo_file:       photoFile,
-      custom_card_file: photoFile,
-      custom_card_url:  imageUrl.trim() || undefined,
-      photo_url:        imageUrl.trim() || undefined,
-    });
-    setLoading(false);
+    try {
+      const result = await addPlayer({
+        name:             name.trim(),
+        in_game_name:     name.trim(),
+        base_price:       Number(basePrice),
+        max_limit:        Number(maxLimit),
+        role,
+        photo_file:       photoFile,
+        custom_card_file: photoFile,
+        custom_card_url:  imageUrl.trim() || undefined,
+        photo_url:        imageUrl.trim() || undefined,
+      });
+      setLoading(false);
 
-    if (result.success) {
-      // Flash success state, then reset form
-      setSuccess(true);
-      setTimeout(() => {
-        setSuccess(false);
-        setName('');
-        setBasePrice('');
-        setMaxLimit('');
-        setRole('');
-        setPhotoFile(null);
-        setImageUrl('');
-        setPreview(null);
-        if (previewUrlRef.current) {
-          URL.revokeObjectURL(previewUrlRef.current);
-          previewUrlRef.current = null;
-        }
-        onSuccess?.();
-      }, 1800);
-    } else {
-      setSubmitError(result.error || 'Failed to add player. Try again.');
+      if (result && result.success) {
+        // Flash success state, then reset form
+        setSuccess(true);
+        setTimeout(() => {
+          setSuccess(false);
+          setName('');
+          setBasePrice('');
+          setMaxLimit('');
+          setRole('');
+          setPhotoFile(null);
+          setImageUrl('');
+          setPreview(null);
+          if (previewUrlRef.current) {
+            URL.revokeObjectURL(previewUrlRef.current);
+            previewUrlRef.current = null;
+          }
+          onSuccess?.();
+        }, 1800);
+      } else {
+        const errorMsg = result?.error || 'Failed to add player. Check console for details.';
+        setSubmitError(errorMsg);
+      }
+    } catch (error) {
+      console.error('Detailed Fetch Error:', error);
+      setLoading(false);
+      setSubmitError(error?.message || 'TypeError: Failed to fetch. Check developer console for CORS/network failure.');
     }
   };
 
