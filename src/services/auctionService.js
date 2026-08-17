@@ -1168,6 +1168,7 @@ export async function hardResetDatabase() {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function updateTeamStandings(teamId, stats = {}) {
   try {
+    if (!teamId) return { success: false, error: 'Missing team ID' };
     const cleanId = String(teamId).trim();
     const payload = {
       matches_played: safeInt(stats.matches_played, 0),
@@ -1183,7 +1184,12 @@ export async function updateTeamStandings(teamId, stats = {}) {
       .eq('id', cleanId);
 
     if (error) {
-      console.warn(`[updateTeamStandings] Primary update failed for ${cleanId}:`, error.message);
+      if (error.message && (error.message.includes('schema cache') || error.message.includes('column'))) {
+        return {
+          success: false,
+          error: `Missing columns on 'teams' table in Supabase. Please run the SQL schema update in your Supabase SQL Editor. (${error.message})`,
+        };
+      }
       return { success: false, error: error.message };
     }
 

@@ -1,76 +1,85 @@
 import React, { useState, useEffect } from 'react';
-import { TEAMS_CONFIG, getTeamDisplayName, getTeamOwner, getTeamLogo } from '../config/teamsConfig';
-import { updateTeamStandings, updateAllTeamStandings, resetAllTeamStandings } from '../services/auctionService';
+import { supabase } from '../config/supabase';
+import { getTeamDisplayName, getTeamOwner, getTeamLogo } from '../config/teamsConfig';
 
 export function StandingsControlMatrix({ teams = [], onRefresh }) {
   const [standingsData, setStandingsData] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // { success: boolean, message: string }
 
-  // Sync teams state into local matrix state on load or change
+  // Sync strictly from the live database teams array
   useEffect(() => {
+    if (!teams || teams.length === 0) return;
+
     const matrix = {};
-    TEAMS_CONFIG.forEach((config) => {
-      const dbMatch = (teams || []).find(
-        (t) =>
-          String(t.id).toLowerCase() === config.id.toLowerCase() ||
-          config.aliases?.includes(String(t.id).toLowerCase())
-      );
+    teams.forEach((team) => {
+      const liveId = team.id;
+      const rawDiff = team.score_diff ?? team.diff ?? 0;
+      const numDiff = typeof rawDiff === 'string' ? parseInt(rawDiff.replace('+', ''), 10) || 0 : (Number(rawDiff) || 0);
 
-      const defaults = config.defaultStats || { wins: 0, losses: 0, diff: '0', pts: 0 };
-      const rawDiff = dbMatch?.score_diff ?? defaults.diff;
-      const numDiff = typeof rawDiff === 'string' ? parseInt(rawDiff.replace('+', ''), 10) || 0 : (rawDiff || 0);
-
-      matrix[config.id] = {
-        id: dbMatch?.id || config.id,
-        name: config.name,
-        owner: config.owner,
-        logo: config.logo,
-        matches_played: dbMatch?.matches_played ?? (defaults.wins + defaults.losses),
-        wins: dbMatch?.wins ?? defaults.wins,
-        losses: dbMatch?.losses ?? defaults.losses,
+      matrix[liveId] = {
+        id: liveId,
+        name: getTeamDisplayName(liveId, team.team_name || team.name),
+        owner: getTeamOwner(liveId, team.owner_name || team.owner),
+        logo: getTeamLogo(liveId),
+        matches_played: Number(team.matches_played ?? ((team.wins || 0) + (team.losses || 0))),
+        wins: Number(team.wins ?? 0),
+        losses: Number(team.losses ?? 0),
         score_diff: numDiff,
-        points: dbMatch?.points ?? defaults.pts,
+        points: Number(team.points ?? team.pts ?? 0),
       };
     });
+
     setStandingsData(matrix);
   }, [teams]);
 
-  // Handler for stepper / input changes
-  const handleFieldChange = (teamId, field, value) => {
+  // If no teams loaded yet
+  if (!teams || teams.length === 0) {
+    return (
+      <div className="p-8 bg-[#0e1017] border-2 border-white/15 text-center font-rajdhani rounded-2xl">
+        <div className="w-8 h-8 rounded-xl border-2 border-amber-500/30 border-t-amber-500 animate-spin mx-auto mb-3" />
+        <p className="text-slate-300 font-bold uppercase tracking-wider text-sm">
+          Loading live franchise database records...
+        </p>
+      </div>
+    );
+  }
+
+  // Handler for numerical changes
+  const handleFieldChange = (liveTeamId, field, value) => {
     const num = parseInt(value, 10);
     setStandingsData((prev) => ({
       ...prev,
-      [teamId]: {
-        ...prev[teamId],
+      [liveTeamId]: {
+        ...prev[liveTeamId],
         [field]: isNaN(num) ? 0 : num,
       },
     }));
   };
 
-  const handleStep = (teamId, field, delta) => {
+  const handleStep = (liveTeamId, field, delta) => {
     setStandingsData((prev) => {
-      const current = prev[teamId]?.[field] ?? 0;
+      const current = prev[liveTeamId]?.[field] ?? 0;
       const next = current + delta;
       return {
         ...prev,
-        [teamId]: {
-          ...prev[teamId],
+        [liveTeamId]: {
+          ...prev[liveTeamId],
           [field]: field === 'score_diff' ? next : Math.max(0, next),
         },
       };
     });
   };
 
-  // Auto-calculate Points helper: Wins * 2 (or custom)
-  const handleAutoCalcPoints = (teamId) => {
+  // Auto-calculate Points helper: (Wins * 3) + Math.floor(Diff / 5)
+  const handleAutoCalcPoints = (liveTeamId) => {
     setStandingsData((prev) => {
-      const team = prev[teamId];
+      const team = prev[liveTeamId];
       if (!team) return prev;
       const calculatedPts = (team.wins * 3) + Math.max(0, Math.floor(team.score_diff / 5));
       return {
         ...prev,
-        [teamId]: {
+        [liveTeamId]: {
           ...team,
           points: Math.max(0, calculatedPts),
         },
@@ -78,53 +87,123 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
     });
   };
 
-  // Save single team to Supabase
-  const handleSaveTeam = async (teamId) => {
+  // Direct Supabase Update by live database team.id
+  const handleSaveTeam = async (liveTeamId) => {
     setSaving(true);
     setSaveStatus(null);
-    const item = standingsData[teamId];
-    if (!item) return;
+    const item = standingsData[liveTeamId];
+    if (!item) {
+      setSaving(false);
+      return;
+    }
 
-    const res = await updateTeamStandings(item.id || teamId, item);
-    setSaving(false);
-    if (res.success) {
-      setSaveStatus({ success: true, message: `Updated ${item.name} stats successfully!` });
-      onRefresh?.();
-      setTimeout(() => setSaveStatus(null), 3500);
-    } else {
-      setSaveStatus({ success: false, message: `Failed to update ${item.name}: ${res.error}` });
+    try {
+      const payload = {
+        matches_played: parseInt(item.matches_played, 10) || 0,
+        wins:           parseInt(item.wins, 10) || 0,
+        losses:         parseInt(item.losses, 10) || 0,
+        score_diff:     parseInt(item.score_diff, 10) || 0,
+        points:         parseInt(item.points, 10) || 0,
+      };
+
+      const { error } = await supabase
+        .from('teams')
+        .update(payload)
+        .eq('id', liveTeamId);
+
+      setSaving(false);
+
+      if (error) {
+        setSaveStatus({
+          success: false,
+          message: `Database Error: ${error.message}. If missing columns, please run the SQL query in Supabase!`,
+        });
+      } else {
+        setSaveStatus({ success: true, message: `Updated ${item.name} in database successfully!` });
+        onRefresh?.();
+        setTimeout(() => setSaveStatus(null), 3500);
+      }
+    } catch (err) {
+      setSaving(false);
+      setSaveStatus({ success: false, message: `Exception: ${err.message}` });
     }
   };
 
-  // Save all 4 teams to Supabase simultaneously
+  // Save all teams simultaneously by their exact live database team.id
   const handleSaveAll = async () => {
     setSaving(true);
     setSaveStatus(null);
-    const items = Object.values(standingsData);
-    const res = await updateAllTeamStandings(items);
-    setSaving(false);
 
-    if (res.success) {
-      setSaveStatus({ success: true, message: 'All 4 Franchise Standings updated and broadcast live!' });
-      onRefresh?.();
-      setTimeout(() => setSaveStatus(null), 4000);
-    } else {
-      setSaveStatus({ success: false, message: `Error updating standings: ${res.error}` });
+    try {
+      const entries = Object.entries(standingsData);
+      const errors = [];
+
+      for (const [liveTeamId, item] of entries) {
+        const payload = {
+          matches_played: parseInt(item.matches_played, 10) || 0,
+          wins:           parseInt(item.wins, 10) || 0,
+          losses:         parseInt(item.losses, 10) || 0,
+          score_diff:     parseInt(item.score_diff, 10) || 0,
+          points:         parseInt(item.points, 10) || 0,
+        };
+
+        const { error } = await supabase
+          .from('teams')
+          .update(payload)
+          .eq('id', liveTeamId);
+
+        if (error) {
+          errors.push(`${item.name || liveTeamId}: ${error.message}`);
+        }
+      }
+
+      setSaving(false);
+
+      if (errors.length > 0) {
+        setSaveStatus({
+          success: false,
+          message: `Failed to update: ${errors.join(', ')}. Please verify Supabase SQL schema!`,
+        });
+      } else {
+        setSaveStatus({ success: true, message: 'All live franchise standings saved and broadcast to overlay!' });
+        onRefresh?.();
+        setTimeout(() => setSaveStatus(null), 4000);
+      }
+    } catch (err) {
+      setSaving(false);
+      setSaveStatus({ success: false, message: `Exception: ${err.message}` });
     }
   };
 
-  // Reset all to 0
+  // Reset all live teams in database
   const handleResetAll = async () => {
     if (!window.confirm('Are you sure you want to reset all team match records and points to 0?')) return;
     setSaving(true);
-    const res = await resetAllTeamStandings();
-    setSaving(false);
-    if (res.success) {
-      setSaveStatus({ success: true, message: 'All standings successfully reset to 0.' });
-      onRefresh?.();
-      setTimeout(() => setSaveStatus(null), 3500);
-    } else {
-      setSaveStatus({ success: false, message: res.error || 'Failed to reset standings' });
+
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .update({
+          matches_played: 0,
+          wins:           0,
+          losses:         0,
+          score_diff:     0,
+          points:         0,
+        })
+        .neq('id', '___ZERO_MATCH_SAFE_KEY___');
+
+      setSaving(false);
+
+      if (error) {
+        setSaveStatus({ success: false, message: `Reset failed: ${error.message}` });
+      } else {
+        setSaveStatus({ success: true, message: 'All team standings successfully reset to 0 in database.' });
+        onRefresh?.();
+        setTimeout(() => setSaveStatus(null), 3500);
+      }
+    } catch (err) {
+      setSaving(false);
+      setSaveStatus({ success: false, message: `Exception: ${err.message}` });
     }
   };
 
@@ -152,7 +231,7 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
             </span>
           </div>
           <p className="text-xs text-slate-400 font-inter mt-0.5">
-            Adjust Wins, Losses, Score Differential, and Total Points. Changes instantly sync to the 1080p OBS Broadcast.
+            Real-time database updates for Wins, Losses, Differential, and Points (queries live database table directly by ID).
           </p>
         </div>
 
@@ -200,10 +279,15 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
         </div>
       )}
 
-      {/* ── 4-Team Input Matrix Grid ──────────────────────────────────── */}
+      {/* ── 4-Team Dynamic Input Grid ─────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-        {TEAMS_CONFIG.map((config) => {
-          const item = standingsData[config.id] || {
+        {teams.map((team) => {
+          const liveTeamId = team.id;
+          const item = standingsData[liveTeamId] || {
+            id: liveTeamId,
+            name: getTeamDisplayName(liveTeamId, team.team_name || team.name),
+            owner: getTeamOwner(liveTeamId, team.owner_name || team.owner),
+            logo: getTeamLogo(liveTeamId),
             matches_played: 0,
             wins: 0,
             losses: 0,
@@ -211,9 +295,10 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
             points: 0,
           };
 
-          const isPower = config.id.includes('alpha');
-          const isVortex = config.id.includes('beta');
-          const isAbyssal = config.id.includes('gamma');
+          const cleanName = (item.name || '').toUpperCase();
+          const isPower = cleanName.includes('POWER') || cleanName.includes('ALPHA');
+          const isVortex = cleanName.includes('VORTEX') || cleanName.includes('BETA');
+          const isAbyssal = cleanName.includes('ABYSSAL') || cleanName.includes('EBON') || cleanName.includes('GAMMA');
 
           const accentBorder = isPower
             ? 'border-amber-500/40 hover:border-amber-400'
@@ -225,7 +310,7 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
 
           return (
             <div
-              key={config.id}
+              key={liveTeamId}
               style={{
                 clipPath: 'polygon(0% 0%, calc(100% - 16px) 0%, 100% 16px, 100% 100%, 16px 100%, 0% calc(100% - 16px))',
               }}
@@ -241,24 +326,24 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
                     className="w-10 h-10 bg-black border border-white/20 p-0.5 flex-shrink-0 flex items-center justify-center"
                   >
                     <img
-                      src={config.logo}
-                      alt={config.name}
+                      src={item.logo}
+                      alt={item.name}
                       className="w-full h-full object-cover"
                       onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
                     />
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-black italic text-lg sm:text-xl text-white uppercase tracking-wider truncate">
-                      {config.name}
+                      {item.name}
                     </h3>
                     <p className="text-[11px] text-slate-400 font-bold">
-                      Owner: <span className="text-amber-300">{config.owner}</span>
+                      Owner: <span className="text-amber-300">{item.owner}</span>
                     </p>
                   </div>
                 </div>
 
                 <button
-                  onClick={() => handleSaveTeam(config.id)}
+                  onClick={() => handleSaveTeam(liveTeamId)}
                   disabled={saving}
                   className="px-3 py-1 bg-surface-800 hover:bg-surface-700 text-slate-200 hover:text-white border border-white/20 hover:border-amber-400 font-black italic text-xs uppercase tracking-wider transition-colors cursor-pointer"
                 >
@@ -275,7 +360,7 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
                   </span>
                   <div className="flex items-center gap-1.5 my-1.5">
                     <button
-                      onClick={() => handleStep(config.id, 'wins', -1)}
+                      onClick={() => handleStep(liveTeamId, 'wins', -1)}
                       className="w-6 h-6 rounded bg-surface-800 hover:bg-surface-700 text-white font-black text-xs flex items-center justify-center border border-white/10"
                     >
                       -
@@ -283,11 +368,11 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
                     <input
                       type="number"
                       value={item.wins}
-                      onChange={(e) => handleFieldChange(config.id, 'wins', e.target.value)}
+                      onChange={(e) => handleFieldChange(liveTeamId, 'wins', e.target.value)}
                       className="w-12 bg-transparent text-center font-black italic text-lg text-emerald-300 focus:outline-none"
                     />
                     <button
-                      onClick={() => handleStep(config.id, 'wins', 1)}
+                      onClick={() => handleStep(liveTeamId, 'wins', 1)}
                       className="w-6 h-6 rounded bg-surface-800 hover:bg-surface-700 text-white font-black text-xs flex items-center justify-center border border-white/10"
                     >
                       +
@@ -302,7 +387,7 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
                   </span>
                   <div className="flex items-center gap-1.5 my-1.5">
                     <button
-                      onClick={() => handleStep(config.id, 'losses', -1)}
+                      onClick={() => handleStep(liveTeamId, 'losses', -1)}
                       className="w-6 h-6 rounded bg-surface-800 hover:bg-surface-700 text-white font-black text-xs flex items-center justify-center border border-white/10"
                     >
                       -
@@ -310,11 +395,11 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
                     <input
                       type="number"
                       value={item.losses}
-                      onChange={(e) => handleFieldChange(config.id, 'losses', e.target.value)}
+                      onChange={(e) => handleFieldChange(liveTeamId, 'losses', e.target.value)}
                       className="w-12 bg-transparent text-center font-black italic text-lg text-rose-300 focus:outline-none"
                     />
                     <button
-                      onClick={() => handleStep(config.id, 'losses', 1)}
+                      onClick={() => handleStep(liveTeamId, 'losses', 1)}
                       className="w-6 h-6 rounded bg-surface-800 hover:bg-surface-700 text-white font-black text-xs flex items-center justify-center border border-white/10"
                     >
                       +
@@ -329,7 +414,7 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
                   </span>
                   <div className="flex items-center gap-1.5 my-1.5">
                     <button
-                      onClick={() => handleStep(config.id, 'score_diff', -1)}
+                      onClick={() => handleStep(liveTeamId, 'score_diff', -1)}
                       className="w-6 h-6 rounded bg-surface-800 hover:bg-surface-700 text-white font-black text-xs flex items-center justify-center border border-white/10"
                     >
                       -
@@ -337,11 +422,11 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
                     <input
                       type="number"
                       value={item.score_diff}
-                      onChange={(e) => handleFieldChange(config.id, 'score_diff', e.target.value)}
+                      onChange={(e) => handleFieldChange(liveTeamId, 'score_diff', e.target.value)}
                       className="w-12 bg-transparent text-center font-black italic text-base text-slate-200 focus:outline-none"
                     />
                     <button
-                      onClick={() => handleStep(config.id, 'score_diff', 1)}
+                      onClick={() => handleStep(liveTeamId, 'score_diff', 1)}
                       className="w-6 h-6 rounded bg-surface-800 hover:bg-surface-700 text-white font-black text-xs flex items-center justify-center border border-white/10"
                     >
                       +
@@ -356,7 +441,7 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
                   </span>
                   <div className="flex items-center gap-1.5 my-1.5">
                     <button
-                      onClick={() => handleStep(config.id, 'points', -1)}
+                      onClick={() => handleStep(liveTeamId, 'points', -1)}
                       className="w-6 h-6 rounded bg-surface-800 hover:bg-surface-700 text-amber-400 font-black text-xs flex items-center justify-center border border-amber-500/30"
                     >
                       -
@@ -364,11 +449,11 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
                     <input
                       type="number"
                       value={item.points}
-                      onChange={(e) => handleFieldChange(config.id, 'points', e.target.value)}
+                      onChange={(e) => handleFieldChange(liveTeamId, 'points', e.target.value)}
                       className="w-12 bg-transparent text-center font-black italic text-xl text-amber-300 focus:outline-none tabular-nums"
                     />
                     <button
-                      onClick={() => handleStep(config.id, 'points', 1)}
+                      onClick={() => handleStep(liveTeamId, 'points', 1)}
                       className="w-6 h-6 rounded bg-surface-800 hover:bg-surface-700 text-amber-400 font-black text-xs flex items-center justify-center border border-amber-500/30"
                     >
                       +
@@ -381,7 +466,7 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
               <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 pt-1">
                 <span>Total Matches: {(item.wins || 0) + (item.losses || 0)}</span>
                 <button
-                  onClick={() => handleAutoCalcPoints(config.id)}
+                  onClick={() => handleAutoCalcPoints(liveTeamId)}
                   className="text-amber-400 hover:text-amber-300 font-black uppercase tracking-wider text-[10px] underline cursor-pointer"
                 >
                   ⚡ Auto-Calc PTS (3×W + Diff)
