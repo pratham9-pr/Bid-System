@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { RoleBadge } from './RoleBadge';
-import { getTeamFullRoster, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
+import { getTeamFullRoster, isPlayerAssignedToTeam, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
 import { appointTeamCaptain, removePlayerFromRoster, resetAllRostersAndCaptains, DEFAULT_TEAM_PURSE } from '../services/auctionService';
 import { getTeamLogo, getTeamDisplayName, getTeamOwner } from '../config/teamsConfig';
 
@@ -15,7 +15,7 @@ function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamNa
   const eligibleForCaptain = Array.from(
     new Map(
       (allPlayers || [])
-        .filter((p) => !p.is_captain || p.sold_to_team_id === teamId || !p.sold_to_team_id)
+        .filter((p) => !p.is_captain || isPlayerAssignedToTeam(p, teamId) || !p.sold_to_team_id)
         .map((p) => [String(p.id), p])
     ).values()
   );

@@ -6,6 +6,7 @@ import { useAllTeams } from '../hooks/useAllTeams';
 import { useAuctionRoom } from '../hooks/useAuctionRoom';
 import { PlayerControlCard } from '../components/PlayerControlCard';
 import { TeamLeaderboard } from '../components/TeamLeaderboard';
+import { StandingsControlMatrix } from '../components/StandingsControlMatrix';
 import { AddPlayerForm } from '../components/AddPlayerForm';
 import { TeamRosters } from '../components/TeamRosters';
 import { getTeamDisplayName, TEAMS_CONFIG } from '../config/teamsConfig';
@@ -30,7 +31,7 @@ export default function AdminPanel() {
   const [sellMsg,    setSellMsg]    = useState(null); // { ok, text }
 
   const { players, loading: pLoading } = useAllPlayers();
-  const { teams,   loading: tLoading } = useAllTeams();
+  const { teams,   loading: tLoading, refetch: refetchTeams } = useAllTeams();
   const { activePlayer, auctionPaused, isRevealed, biddingOpen } = useAuctionRoom(null);
 
   const handleSeed = async () => {
@@ -591,15 +592,33 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Leaderboard tab */}
+        {/* Leaderboard & Standings tab */}
         {activeTab === 'Leaderboard' && (
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-5xl mx-auto space-y-8">
             {tLoading ? (
               <div className="flex justify-center py-16">
                 <div className="w-8 h-8 rounded-xl border-2 border-fire-500/30 border-t-fire-500 animate-spin" />
               </div>
             ) : (
-              <TeamLeaderboard teams={teams} />
+              <>
+                <StandingsControlMatrix teams={teams} onRefresh={refetchTeams} />
+                <div className="pt-4 border-t border-white/10">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-xs font-black italic tracking-widest text-slate-400 uppercase">
+                      LIVE BROADCAST PREVIEW
+                    </span>
+                    <a
+                      href="/leaderboard"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-black italic text-amber-400 hover:text-white underline"
+                    >
+                      Open Fullscreen 1920×1080 OBS Window ↗
+                    </a>
+                  </div>
+                  <TeamLeaderboard teams={teams} />
+                </div>
+              </>
             )}
           </div>
         )}

@@ -13,6 +13,7 @@ export const TEAMS_CONFIG = [
     color: 'border-fire-500/40 text-fire-400 bg-fire-500/10 hover:border-fire-500/80 hover:bg-fire-500/20 shadow-[0_0_20px_rgba(249,115,22,0.15)]',
     accentColor: 'rgba(249,115,22,0.15)',
     isPending: false,
+    defaultStats: { wins: 5, losses: 1, diff: '+42', pts: 98 },
   },
   {
     id: 'beta_strikers',
@@ -24,6 +25,7 @@ export const TEAMS_CONFIG = [
     color: 'border-sky-500/40 text-sky-400 bg-sky-500/10 hover:border-sky-500/80 hover:bg-sky-500/20 shadow-[0_0_20px_rgba(14,165,233,0.15)]',
     accentColor: 'rgba(14,165,233,0.15)',
     isPending: false,
+    defaultStats: { wins: 4, losses: 2, diff: '+28', pts: 84 },
   },
   {
     id: 'gamma_reapers',
@@ -35,6 +37,7 @@ export const TEAMS_CONFIG = [
     color: 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10 hover:border-emerald-500/80 hover:bg-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.15)]',
     accentColor: 'rgba(16,185,129,0.15)',
     isPending: false,
+    defaultStats: { wins: 3, losses: 3, diff: '+12', pts: 67 },
   },
   {
     id: 'delta_phantoms',
@@ -46,6 +49,7 @@ export const TEAMS_CONFIG = [
     color: 'border-purple-500/40 text-purple-400 bg-purple-500/10 hover:border-purple-500/80 hover:bg-purple-500/20 shadow-[0_0_20px_rgba(168,85,247,0.15)]',
     accentColor: 'rgba(168,85,247,0.15)',
     isPending: false,
+    defaultStats: { wins: 2, losses: 4, diff: '-18', pts: 49 },
   },
 ];
 

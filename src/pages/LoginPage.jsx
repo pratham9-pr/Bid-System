@@ -55,17 +55,17 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Stream Overlay Quick Access Card */}
-          <div className="w-full max-w-md pt-2">
+          {/* Stream Overlay & Points Table Quick Access Cards */}
+          <div className="w-full max-w-md pt-2 flex flex-col gap-2.5">
             <button
               id="goto-broadcast-btn"
               onClick={() => navigate('/broadcast')}
-              className="w-full p-4 rounded-2xl bg-surface-900/80 border border-fire-500/30 hover:border-fire-500/70
+              className="w-full p-3.5 rounded-2xl bg-surface-900/80 border border-fire-500/30 hover:border-fire-500/70
                          hover:shadow-[0_0_30px_rgba(249,115,22,0.25)] transition-all duration-300 group
                          flex items-center justify-between gap-4 text-left cursor-pointer backdrop-blur-md"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-fire-500/15 border border-fire-500/30 flex items-center justify-center text-lg flex-shrink-0 group-hover:scale-110 transition-transform">
+                <div className="w-9 h-9 rounded-xl bg-fire-500/15 border border-fire-500/30 flex items-center justify-center text-lg flex-shrink-0 group-hover:scale-110 transition-transform">
                   📺
                 </div>
                 <div>
@@ -83,6 +83,36 @@ export default function LoginPage() {
                 </div>
               </div>
               <span className="text-slate-400 group-hover:text-fire-400 group-hover:translate-x-1 transition-all text-sm font-bold">
+                →
+              </span>
+            </button>
+
+            <button
+              id="goto-leaderboard-btn"
+              onClick={() => navigate('/leaderboard')}
+              className="w-full p-3.5 rounded-2xl bg-surface-900/80 border border-amber-500/30 hover:border-amber-500/70
+                         hover:shadow-[0_0_30px_rgba(245,158,11,0.25)] transition-all duration-300 group
+                         flex items-center justify-between gap-4 text-left cursor-pointer backdrop-blur-md"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-lg flex-shrink-0 group-hover:scale-110 transition-transform">
+                  🏆
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-rajdhani font-black text-sm text-white uppercase tracking-wider group-hover:text-amber-300 transition-colors">
+                      Demons Reign Points Table
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[9px] font-rajdhani font-black uppercase">
+                      1080p OBS
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-inter">
+                    Open official tournament standings (/leaderboard)
+                  </p>
+                </div>
+              </div>
+              <span className="text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition-all text-sm font-bold">
                 →
               </span>
             </button>

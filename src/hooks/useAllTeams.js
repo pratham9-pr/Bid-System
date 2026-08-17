@@ -1,20 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
-
-/**
- * useAllTeams (Supabase Realtime)
- * Fetches all teams sorted by fire_coin_balance descending.
- */
-function normalizeTeam(t) {
-  if (!t) return t;
-  let balance = typeof t.fire_coin_balance === 'number' ? t.fire_coin_balance : 40000;
-  // If legacy balance exceeds 40,000 (e.g. 50,000 starting or 48,000 where 2000 was spent), recalculate from 40k base
-  if (balance > 40000) {
-    const spent = Math.max(0, 50000 - balance);
-    balance = Math.max(0, 40000 - spent);
-  }
-  return { ...t, fire_coin_balance: balance };
-}
+import { isPlayerAssignedToTeam } from '../config/franchiseCaptains';
 
 export function useAllTeams() {
   const [teams,   setTeams]   = useState([]);
@@ -40,13 +26,19 @@ export function useAllTeams() {
           (p) =>
             p.status === 'sold' &&
             !p.is_captain &&
-            p.role !== 'IGL' &&
-            (p.sold_price > 0 || p.current_bid > 0) &&
-            (String(p.sold_to_team_id) === String(t.id) || String(p.current_highest_bidder) === String(t.id))
+            isPlayerAssignedToTeam(p, t.id)
         );
         const spent = teamDrafted.reduce((sum, p) => sum + (p.sold_price || p.current_bid || 0), 0);
         const balance = Math.max(0, 40000 - spent);
-        return { ...t, fire_coin_balance: balance };
+        return {
+          ...t,
+          matches_played: typeof t.matches_played === 'number' ? t.matches_played : 0,
+          wins:           typeof t.wins === 'number' ? t.wins : 0,
+          losses:         typeof t.losses === 'number' ? t.losses : 0,
+          score_diff:     typeof t.score_diff === 'number' ? t.score_diff : 0,
+          points:         typeof t.points === 'number' ? t.points : 0,
+          fire_coin_balance: balance,
+        };
       });
 
       setTeams(normalized);

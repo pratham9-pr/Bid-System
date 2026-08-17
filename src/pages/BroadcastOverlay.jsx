@@ -157,7 +157,7 @@ function FranchiseSidebarCard({ teamId, teams, players }) {
       {/* ── 4 Vertical Roster Slot Rows ──────────────────────────────── */}
       <div className="flex-1 flex flex-col gap-1 justify-center py-0.5 min-h-0 overflow-hidden">
         {slots.map((player, idx) => {
-          const isCaptain = (idx === 0 && player && player.is_captain) || player?.role === 'IGL';
+          const isCaptain = idx === 0 && player && (player.is_captain === true || player.status === 'captain');
 
           if (!player) {
             return (

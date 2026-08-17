@@ -14,10 +14,22 @@ CREATE TABLE IF NOT EXISTS public.teams (
     team_name TEXT NOT NULL,
     owner_name TEXT NOT NULL,
     owner_email TEXT NOT NULL UNIQUE,
-    fire_coin_balance BIGINT NOT NULL DEFAULT 50000 CHECK (fire_coin_balance >= 0),
+    fire_coin_balance BIGINT NOT NULL DEFAULT 40000 CHECK (fire_coin_balance >= 0),
+    matches_played INTEGER NOT NULL DEFAULT 0,
+    wins INTEGER NOT NULL DEFAULT 0,
+    losses INTEGER NOT NULL DEFAULT 0,
+    score_diff INTEGER NOT NULL DEFAULT 0,
+    points INTEGER NOT NULL DEFAULT 0,
     last_bid_time TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure standings columns exist on existing database instances
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS matches_played INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS wins INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS losses INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS score_diff INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS points INTEGER NOT NULL DEFAULT 0;
 
 -- 3. Players Table
 CREATE TABLE IF NOT EXISTS public.players (

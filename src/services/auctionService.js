@@ -488,17 +488,78 @@ export async function hidePlayer() {
 export async function forcePlayerSold(playerId) {
   try {
     const pId = String(playerId);
-    const { data, error } = await supabase.rpc('force_player_sold', {
-      p_player_id: pId,
-    });
-    if (error) {
-      // Direct fallback — use integer id, never the string "current"
-      await supabase.from('players').update({ status: 'sold' }).eq('id', pId);
-      await safeUpdateAuctionState({ status: 'sold' });
-      return { success: true };
+
+    // 1. Fetch player
+    const { data: player } = await supabase
+      .from('players')
+      .select('*')
+      .eq('id', pId)
+      .maybeSingle();
+
+    if (!player) return { success: false, error: 'Player not found' };
+
+    const winningTeamId = player.current_highest_bidder;
+    if (!winningTeamId) {
+      return { success: false, error: 'No bids placed on this player yet.' };
     }
-    return data;
+
+    const sellPrice = safeNum(player.current_bid, 0) || safeNum(player.base_price, 0);
+
+    // 2. Fetch winning team
+    const { data: teamData } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('id', winningTeamId)
+      .maybeSingle();
+
+    const teamDisplayName = getTeamDisplayName(winningTeamId, teamData?.team_name || player.current_highest_bidder_name);
+
+    // 3. Mark player as sold
+    const { error: pErr } = await supabase
+      .from('players')
+      .update({
+        status:                      'sold',
+        sold_to_team_id:             winningTeamId,
+        sold_price:                  sellPrice,
+        current_bid:                 sellPrice,
+        current_highest_bidder:      winningTeamId,
+        current_highest_bidder_name: teamDisplayName,
+      })
+      .eq('id', pId);
+
+    if (pErr) {
+      console.error('[forcePlayerSold] Player update failed:', pErr.message);
+      return { success: false, error: pErr.message };
+    }
+
+    // 4. Deduct balance from winning team
+    if (teamData && typeof teamData.fire_coin_balance === 'number') {
+      const newBal = Math.max(0, teamData.fire_coin_balance - sellPrice);
+      await supabase
+        .from('teams')
+        .update({
+          fire_coin_balance: newBal,
+          last_bid_time: new Date().toISOString(),
+        })
+        .eq('id', winningTeamId);
+    }
+
+    // 5. Update auction state
+    await safeUpdateAuctionState({
+      status:                 'sold',
+      bidding_open:           false,
+      current_bid:            sellPrice,
+      highest_bidder_team_id: winningTeamId,
+    });
+
+    return {
+      success: true,
+      playerName: player.in_game_name || player.name,
+      teamName: teamDisplayName,
+      sellPrice,
+    };
   } catch (err) {
+    console.error('[forcePlayerSold] Exception:', err);
     return { success: false, error: err.message };
   }
 }
@@ -1101,4 +1162,75 @@ export async function hardResetDatabase() {
     return { success: false, error: err.message || 'Failed to hard reset database' };
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  STANDINGS & MATCH MATRIX CONTROLS (Demons Reign Host Admin Controls)
+// ─────────────────────────────────────────────────────────────────────────────
+export async function updateTeamStandings(teamId, stats = {}) {
+  try {
+    const cleanId = String(teamId).trim();
+    const payload = {
+      matches_played: safeInt(stats.matches_played, 0),
+      wins:           safeInt(stats.wins, 0),
+      losses:         safeInt(stats.losses, 0),
+      score_diff:     safeInt(stats.score_diff, 0),
+      points:         safeInt(stats.points, 0),
+    };
+
+    const { data, error } = await supabase
+      .from('teams')
+      .update(payload)
+      .eq('id', cleanId);
+
+    if (error) {
+      console.warn(`[updateTeamStandings] Primary update failed for ${cleanId}:`, error.message);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  } catch (err) {
+    console.error('[updateTeamStandings] Error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function updateAllTeamStandings(teamsStats = []) {
+  try {
+    const errors = [];
+    for (const item of teamsStats) {
+      if (!item || !item.id) continue;
+      const res = await updateTeamStandings(item.id, item);
+      if (!res.success) {
+        errors.push(`${item.id}: ${res.error}`);
+      }
+    }
+    if (errors.length > 0) {
+      return { success: false, error: errors.join(', ') };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function resetAllTeamStandings() {
+  try {
+    const { error } = await supabase
+      .from('teams')
+      .update({
+        matches_played: 0,
+        wins:           0,
+        losses:         0,
+        score_diff:     0,
+        points:         0,
+      })
+      .neq('id', '___ZERO_MATCH_SAFE_KEY___');
+
+    if (error) throw error;
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
 
