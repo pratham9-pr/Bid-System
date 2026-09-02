@@ -1,11 +1,12 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import LoginPage        from './pages/LoginPage';
-import AuctionRoom      from './pages/AuctionRoom';
-import AdminPanel       from './pages/AdminPanel';
-import BroadcastOverlay from './pages/BroadcastOverlay';
-import PointsTableLeaderboard from './pages/PointsTableLeaderboard';
+import LoginPage                 from './pages/LoginPage';
+import AuctionRoom               from './pages/AuctionRoom';
+import AdminPanel                from './pages/AdminPanel';
+import BroadcastOverlay          from './pages/BroadcastOverlay';
+import PointsTableLeaderboard    from './pages/PointsTableLeaderboard';
+import TournamentAdminDashboard  from './pages/TournamentAdminDashboard';
 
 // ─── Global Error Boundary ───────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
@@ -111,6 +112,16 @@ export default function App() {
               element={
                 <AdminRoute>
                   <AdminPanel />
+                </AdminRoute>
+              }
+            />
+
+            {/* Per-Tournament Admin Dashboard (Role: 'admin') */}
+            <Route
+              path="/admin/tournament/:id"
+              element={
+                <AdminRoute>
+                  <TournamentAdminDashboard />
                 </AdminRoute>
               }
             />
