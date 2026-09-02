@@ -225,14 +225,28 @@ function FranchiseSidebarCard({ teamId, teams, players }) {
   );
 }
 
+import PointsTableLeaderboard from './PointsTableLeaderboard';
+
 // ─────────────────────────────────────────────────────────────────────────────
-//  BroadcastOverlay Component (Three-Column Fullscreen 25% | 50% | 25%)
+//  BroadcastOverlay Component (Three-Column Fullscreen 25% | 50% | 25% + Standings)
 // ─────────────────────────────────────────────────────────────────────────────
 export default function BroadcastOverlay() {
   const { activePlayer, auctionPaused, isRevealed, auctionState } = useAuctionRoom(null);
   const { teams } = useAllTeams();
   const { players } = useAllPlayers();
   const [transparentBg, setTransparentBg] = useState(false);
+  const [activeView, setActiveView] = useState('auction'); // 'auction' | 'standings'
+
+  // Synchronize remote broadcast view if broadcast by host
+  React.useEffect(() => {
+    if (auctionState?.broadcast_view) {
+      if (auctionState.broadcast_view === 'standings' || auctionState.broadcast_view === 'leaderboard') {
+        setActiveView('standings');
+      } else if (auctionState.broadcast_view === 'auction') {
+        setActiveView('auction');
+      }
+    }
+  }, [auctionState?.broadcast_view]);
 
   const isSold = activePlayer?.status === 'sold';
 
@@ -273,8 +287,9 @@ export default function BroadcastOverlay() {
           </div>
         </div>
 
-        {/* Center: Live Stage Status Indicator */}
-        <div className="flex items-center gap-2">
+        {/* Center: Live Stage Status Indicator & View Switcher */}
+        <div className="flex items-center gap-3">
+          {/* Stage State Pill */}
           {auctionPaused ? (
             <span className="flex items-center gap-2 px-3 py-1 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 font-rajdhani font-black text-xs uppercase tracking-widest animate-pulse shadow-[0_0_15px_rgba(245,158,11,0.2)]">
               ⏸ AUCTION PAUSED
@@ -298,6 +313,30 @@ export default function BroadcastOverlay() {
               STANDBY • WAITING FOR HOST
             </span>
           )}
+
+          {/* Broadcast Stage View Switcher */}
+          <div className="flex items-center gap-1 bg-black/60 p-0.5 rounded-xl border border-white/15 shadow-inner">
+            <button
+              onClick={() => setActiveView('auction')}
+              className={`px-3 py-1 rounded-lg text-[10px] font-rajdhani font-black uppercase tracking-wider transition-all cursor-pointer ${
+                activeView === 'auction'
+                  ? 'bg-fire-500 text-black shadow-[0_0_15px_rgba(249,115,22,0.5)]'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🔥 Floor
+            </button>
+            <button
+              onClick={() => setActiveView('standings')}
+              className={`px-3 py-1 rounded-lg text-[10px] font-rajdhani font-black uppercase tracking-wider transition-all cursor-pointer ${
+                activeView === 'standings'
+                  ? 'bg-amber-400 text-black shadow-[0_0_15px_rgba(245,158,11,0.5)]'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              📊 Points Table
+            </button>
+          </div>
         </div>
 
         {/* Right: OBS Transparency Control */}
@@ -314,109 +353,112 @@ export default function BroadcastOverlay() {
       </header>
 
       {/* ===================================================================== */}
-      {/* 2. MAIN THREE-COLUMN FULL VIEWPORT AREA (25% | 50% | 25%)             */}
+      {/* 2. MAIN BROADCAST VIEW: AUCTION FLOOR vs POINTS TABLE                 */}
       {/* ===================================================================== */}
-      <div className="flex-1 w-full p-2 sm:p-3 lg:p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-3.5 min-h-0 overflow-hidden relative z-10">
-        
-        {/* ── LEFT SIDEBAR (25% Width / Col 3): POWER HAWKS & ABYSSAL EBON ── */}
-        <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
-          <FranchiseSidebarCard teamId="alpha_wolves" teams={teams} players={players} />
-          <FranchiseSidebarCard teamId="gamma_reapers" teams={teams} players={players} />
-        </aside>
+      {activeView === 'standings' ? (
+        <div className="flex-1 w-full h-full min-h-0 overflow-hidden relative z-10">
+          <PointsTableLeaderboard transparentBg={transparentBg} />
+        </div>
+      ) : (
+        <div className="flex-1 w-full p-2 sm:p-3 lg:p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-3.5 min-h-0 overflow-hidden relative z-10">
+          {/* ── LEFT SIDEBAR (25% Width / Col 3): POWER HAWKS & ABYSSAL EBON ── */}
+          <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
+            <FranchiseSidebarCard teamId="alpha_wolves" teams={teams} players={players} />
+            <FranchiseSidebarCard teamId="gamma_reapers" teams={teams} players={players} />
+          </aside>
 
-        {/* ── CENTER STAGE (50% Width / Col 6): FULL-BLEED ACTIVE PLAYER CARD & HUD ── */}
-        <main className="lg:col-span-6 w-full h-full min-h-0 flex flex-col justify-between items-center p-0 overflow-hidden relative">
-          <div className="w-full h-full flex flex-col justify-between overflow-hidden relative">
-            
-            {/* 3D Flip Card Container stretching to the exact edges of the center stage */}
-            <div className="w-full flex-1 min-h-0 relative flex flex-col overflow-hidden">
-              <PlayerRevealCard player={activePlayer} isRevealed={isRevealed} auctionState={auctionState} />
+          {/* ── CENTER STAGE (50% Width / Col 6): FULL-BLEED ACTIVE PLAYER CARD & HUD ── */}
+          <main className="lg:col-span-6 w-full h-full min-h-0 flex flex-col justify-between items-center p-0 overflow-hidden relative">
+            <div className="w-full h-full flex flex-col justify-between overflow-hidden relative">
+              {/* 3D Flip Card Container stretching to the exact edges of the center stage */}
+              <div className="w-full flex-1 min-h-0 relative flex flex-col overflow-hidden">
+                <PlayerRevealCard player={activePlayer} isRevealed={isRevealed} auctionState={auctionState} />
 
-              {/* SOLD OUT Stamp Animation */}
-              <AnimatePresence>
-                {isSold && (
-                  <SoldOutStamp
-                    winnerName={activePlayer?.current_highest_bidder_name}
-                    winningBid={activePlayer?.current_bid}
-                  />
-                )}
-              </AnimatePresence>
+                {/* SOLD OUT Stamp Animation */}
+                <AnimatePresence>
+                  {isSold && (
+                    <SoldOutStamp
+                      winnerName={activePlayer?.current_highest_bidder_name}
+                      winningBid={activePlayer?.current_bid}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Glowing Bid Counter HUD — Full-width flush footer */}
+              {activePlayer && isRevealed && (
+                <motion.div
+                  key={`broadcast-bid-${activePlayer.id}-${activePlayer.current_bid ?? auctionState?.current_bid}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className={`w-full flex-shrink-0 px-4 py-2.5 sm:py-3 rounded-2xl border text-center relative overflow-hidden backdrop-blur-2xl mt-2
+                    ${isSold
+                      ? 'bg-gold-500/10 border-gold-500/40 shadow-[0_0_30px_rgba(245,158,11,0.3)]'
+                      : 'bg-surface-900/95 border-fire-500/40 shadow-[0_0_30px_rgba(249,115,22,0.3)]'}`}
+                >
+                  <div className="flex items-center justify-between mb-1 text-[9px] font-rajdhani font-black uppercase tracking-[0.2em] text-slate-400">
+                    <span>{isSold ? '🏆 FINAL WINNING BID' : '🔥 CURRENT HIGHEST BID'}</span>
+                    <span className="text-amber-400 font-black">AUTO-SELL CAP: ₣{MAX_BID_LIMIT.toLocaleString()} FC</span>
+                  </div>
+
+                  {/* Massive Bid Number */}
+                  <div className="flex items-center justify-center gap-1.5 my-0.5">
+                    <span className={`font-rajdhani font-black text-2xl sm:text-3xl ${isSold ? 'text-gold-400' : 'text-fire-400'}`}>
+                      ₣
+                    </span>
+                    <span
+                      className={`font-rajdhani font-black text-3xl sm:text-5xl tracking-tight tabular-nums
+                        ${isSold ? 'text-gradient-gold drop-shadow-[0_0_20px_rgba(245,158,11,0.8)]' : 'text-gradient-fire drop-shadow-[0_0_20px_rgba(249,115,22,0.8)]'}`}
+                    >
+                      {(activePlayer.current_bid ?? auctionState?.current_bid ?? activePlayer.base_price ?? 0).toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* Leading Team Info with Mascot Logo */}
+                  <div className="mt-1.5 pt-1.5 border-t border-white/10 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-md">
+                        <img
+                          src={getTeamLogo(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id)}
+                          alt="Leading Team"
+                          className="w-full h-full object-cover rounded-full"
+                          onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                        />
+                      </div>
+                      <div className="text-left min-w-0">
+                        <span className="text-[8px] text-slate-400 uppercase font-rajdhani font-bold block leading-none">
+                          {isSold ? 'Acquired By' : 'Leading Franchise'}
+                        </span>
+                        <span className="text-xs sm:text-sm font-rajdhani font-black text-white uppercase tracking-wide leading-tight truncate block mt-0.5">
+                          {activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id
+                            ? getTeamDisplayName(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id, activePlayer.current_highest_bidder_name)
+                            : 'AWAITING FIRST BID'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right flex-shrink-0">
+                      <span className="text-[8px] text-slate-400 font-inter uppercase tracking-wider block">
+                        Owner
+                      </span>
+                      <span className="text-xs font-rajdhani font-bold text-amber-300 uppercase">
+                        {getTeamOwner(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id)}
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </div>
+          </main>
 
-            {/* Glowing Bid Counter HUD — Full-width flush footer */}
-            {activePlayer && isRevealed && (
-              <motion.div
-                key={`broadcast-bid-${activePlayer.id}-${activePlayer.current_bid ?? auctionState?.current_bid}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
-                className={`w-full flex-shrink-0 px-4 py-2.5 sm:py-3 rounded-2xl border text-center relative overflow-hidden backdrop-blur-2xl mt-2
-                  ${isSold
-                    ? 'bg-gold-500/10 border-gold-500/40 shadow-[0_0_30px_rgba(245,158,11,0.3)]'
-                    : 'bg-surface-900/95 border-fire-500/40 shadow-[0_0_30px_rgba(249,115,22,0.3)]'}`}
-              >
-                <div className="flex items-center justify-between mb-1 text-[9px] font-rajdhani font-black uppercase tracking-[0.2em] text-slate-400">
-                  <span>{isSold ? '🏆 FINAL WINNING BID' : '🔥 CURRENT HIGHEST BID'}</span>
-                  <span className="text-amber-400 font-black">AUTO-SELL CAP: ₣{MAX_BID_LIMIT.toLocaleString()} FC</span>
-                </div>
-
-                {/* Massive Bid Number */}
-                <div className="flex items-center justify-center gap-1.5 my-0.5">
-                  <span className={`font-rajdhani font-black text-2xl sm:text-3xl ${isSold ? 'text-gold-400' : 'text-fire-400'}`}>
-                    ₣
-                  </span>
-                  <span
-                    className={`font-rajdhani font-black text-3xl sm:text-5xl tracking-tight tabular-nums
-                      ${isSold ? 'text-gradient-gold drop-shadow-[0_0_20px_rgba(245,158,11,0.8)]' : 'text-gradient-fire drop-shadow-[0_0_20px_rgba(249,115,22,0.8)]'}`}
-                  >
-                    {(activePlayer.current_bid ?? auctionState?.current_bid ?? activePlayer.base_price ?? 0).toLocaleString()}
-                  </span>
-                </div>
-
-                {/* Leading Team Info with Mascot Logo */}
-                <div className="mt-1.5 pt-1.5 border-t border-white/10 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-md">
-                      <img
-                        src={getTeamLogo(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id)}
-                        alt="Leading Team"
-                        className="w-full h-full object-cover rounded-full"
-                        onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
-                      />
-                    </div>
-                    <div className="text-left min-w-0">
-                      <span className="text-[8px] text-slate-400 uppercase font-rajdhani font-bold block leading-none">
-                        {isSold ? 'Acquired By' : 'Leading Franchise'}
-                      </span>
-                      <span className="text-xs sm:text-sm font-rajdhani font-black text-white uppercase tracking-wide leading-tight truncate block mt-0.5">
-                        {activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id
-                          ? getTeamDisplayName(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id, activePlayer.current_highest_bidder_name)
-                          : 'AWAITING FIRST BID'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="text-right flex-shrink-0">
-                    <span className="text-[8px] text-slate-400 font-inter uppercase tracking-wider block">
-                      Owner
-                    </span>
-                    <span className="text-xs font-rajdhani font-bold text-amber-300 uppercase">
-                      {getTeamOwner(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id)}
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </div>
-        </main>
-
-        {/* ── RIGHT SIDEBAR (25% Width / Col 3): TEAM VORTEX & RX KUDLA ───── */}
-        <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
-          <FranchiseSidebarCard teamId="beta_strikers" teams={teams} players={players} />
-          <FranchiseSidebarCard teamId="delta_phantoms" teams={teams} players={players} />
-        </aside>
-
-      </div>
+          {/* ── RIGHT SIDEBAR (25% Width / Col 3): TEAM VORTEX & RX KUDLA ───── */}
+          <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
+            <FranchiseSidebarCard teamId="beta_strikers" teams={teams} players={players} />
+            <FranchiseSidebarCard teamId="delta_phantoms" teams={teams} players={players} />
+          </aside>
+        </div>
+      )}
 
       {/* ===================================================================== */}
       {/* 3. MINIMALIST FOOTER TICKER                                           */}

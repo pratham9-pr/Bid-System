@@ -1239,4 +1239,31 @@ export async function resetAllTeamStandings() {
   }
 }
 
+export async function setBroadcastView(viewMode) {
+  try {
+    // Try updating auction_state table
+    try {
+      await supabase
+        .from('auction_state')
+        .update({
+          broadcast_view: viewMode,
+          updated_at: new Date().toISOString(),
+        })
+        .neq('id', '___NEVER_MATCH___');
+    } catch (_) {}
+
+    // Broadcast across realtime channel
+    const channel = supabase.channel('teams_realtime_broadcast_bus');
+    await channel.send({
+      type: 'broadcast',
+      event: 'switch_broadcast_view',
+      payload: { view: viewMode, timestamp: Date.now() },
+    });
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
 

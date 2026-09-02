@@ -10,7 +10,7 @@ import { StandingsControlMatrix } from '../components/StandingsControlMatrix';
 import { AddPlayerForm } from '../components/AddPlayerForm';
 import { TeamRosters } from '../components/TeamRosters';
 import { getTeamDisplayName, TEAMS_CONFIG } from '../config/teamsConfig';
-import { seedDatabase, hardResetDatabase, revealPlayer, hidePlayer, startBidding, closeBidding, manualSellToTeam } from '../services/auctionService';
+import { seedDatabase, hardResetDatabase, revealPlayer, hidePlayer, startBidding, closeBidding, manualSellToTeam, setBroadcastView } from '../services/auctionService';
 
 export default function AdminPanel() {
   const navigate  = useNavigate();
@@ -93,13 +93,39 @@ export default function AdminPanel() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Stream Switchers */}
+          <div className="hidden md:flex items-center gap-1 bg-surface-800/80 p-1 rounded-xl border border-surface-600/40">
+            <button
+              onClick={async () => {
+                await setBroadcastView('auction');
+                setSeedMsg('✓ Switched Live Broadcast overlay to Auction Floor view');
+                setTimeout(() => setSeedMsg(''), 3000);
+              }}
+              className="text-[10px] font-rajdhani font-black uppercase tracking-wider px-2 py-1 rounded-lg text-fire-400 hover:bg-surface-700 transition-colors cursor-pointer"
+              title="Switch OBS stream overlay to Auction Floor"
+            >
+              📺 Stream Floor
+            </button>
+            <button
+              onClick={async () => {
+                await setBroadcastView('standings');
+                setSeedMsg('✓ Switched Live Broadcast overlay to Points Table view');
+                setTimeout(() => setSeedMsg(''), 3000);
+              }}
+              className="text-[10px] font-rajdhani font-black uppercase tracking-wider px-2 py-1 rounded-lg text-amber-400 hover:bg-surface-700 transition-colors cursor-pointer"
+              title="Switch OBS stream overlay to Points Table"
+            >
+              📊 Points Table
+            </button>
+          </div>
+
           <button
             id="admin-broadcast-btn"
             onClick={() => window.open('/broadcast', '_blank')}
             className="btn-ghost text-xs px-2.5 py-1.5 hidden sm:inline-flex items-center gap-1 text-fire-400 border border-fire-500/20 hover:border-fire-500/40"
             title="Open Live Broadcast Overlay in new window (OBS ready)"
           >
-            📺 Stream Overlay
+            📺 Open Overlay ↗
           </button>
           {isAdmin && (
             <>

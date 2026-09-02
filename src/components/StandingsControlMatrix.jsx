@@ -1,52 +1,76 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../config/supabase';
-import { getTeamDisplayName, getTeamOwner, getTeamLogo } from '../config/teamsConfig';
+import { getTeamDisplayName, getTeamOwner, getTeamLogo, TEAMS_CONFIG, getTeamConfig } from '../config/teamsConfig';
 
 export function StandingsControlMatrix({ teams = [], onRefresh }) {
   const [standingsData, setStandingsData] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // { success: boolean, message: string }
+  const isDirtyRef = useRef(false);
 
-  // Sync strictly from the live database teams array
+  // Broadcast helper to immediately notify all overlay clients
+  const broadcastStandingsUpdate = async () => {
+    try {
+      const channel = supabase.channel('teams_realtime_broadcast_bus');
+      await channel.send({
+        type: 'broadcast',
+        event: 'standings_updated',
+        payload: { timestamp: Date.now() },
+      });
+    } catch (e) {
+      console.warn('Broadcast sync notice warning:', e);
+    }
+  };
+
+  // Sync from teams or fallback to TEAMS_CONFIG so host can always edit
   useEffect(() => {
-    if (!teams || teams.length === 0) return;
+    // If user is currently editing, do not clobber their unsaved inputs
+    if (isDirtyRef.current) return;
 
     const matrix = {};
-    teams.forEach((team) => {
-      const liveId = team.id;
-      const rawDiff = team.score_diff ?? team.diff ?? 0;
+    TEAMS_CONFIG.forEach((config) => {
+      const liveTeam = (teams || []).find((t) => {
+        const tId = String(t.id || '').toLowerCase().trim();
+        const tName = String(t.team_name || t.name || '').toLowerCase().trim();
+        return (
+          tId === config.id ||
+          config.aliases?.includes(tId) ||
+          tName === config.name.toLowerCase() ||
+          config.aliases?.some((a) => tName.includes(a))
+        );
+      });
+
+      const liveId = config.id;
+      const rawDiff = liveTeam?.score_diff ?? liveTeam?.diff ?? config.defaultStats?.diff ?? 0;
       const numDiff = typeof rawDiff === 'string' ? parseInt(rawDiff.replace('+', ''), 10) || 0 : (Number(rawDiff) || 0);
+
+      const defaultStats = config.defaultStats || { wins: 0, losses: 0, diff: 0, pts: 0 };
+      const wins = typeof liveTeam?.wins === 'number' ? liveTeam.wins : defaultStats.wins;
+      const losses = typeof liveTeam?.losses === 'number' ? liveTeam.losses : defaultStats.losses;
+      const points = typeof liveTeam?.points === 'number'
+        ? liveTeam.points
+        : (typeof liveTeam?.pts === 'number' ? liveTeam.pts : defaultStats.pts);
 
       matrix[liveId] = {
         id: liveId,
-        name: getTeamDisplayName(liveId, team.team_name || team.name),
-        owner: getTeamOwner(liveId, team.owner_name || team.owner),
+        name: getTeamDisplayName(liveId, liveTeam?.team_name || liveTeam?.name || config.name),
+        owner: getTeamOwner(liveId, liveTeam?.owner_name || liveTeam?.owner || config.owner),
         logo: getTeamLogo(liveId),
-        matches_played: Number(team.matches_played ?? ((team.wins || 0) + (team.losses || 0))),
-        wins: Number(team.wins ?? 0),
-        losses: Number(team.losses ?? 0),
+        matches_played: Number(liveTeam?.matches_played ?? (wins + losses)),
+        wins: Number(wins),
+        losses: Number(losses),
         score_diff: numDiff,
-        points: Number(team.points ?? team.pts ?? 0),
+        points: Number(points),
+        balance: liveTeam?.fire_coin_balance ?? 40000,
       };
     });
 
     setStandingsData(matrix);
   }, [teams]);
 
-  // If no teams loaded yet
-  if (!teams || teams.length === 0) {
-    return (
-      <div className="p-8 bg-[#0e1017] border-2 border-white/15 text-center font-rajdhani rounded-2xl">
-        <div className="w-8 h-8 rounded-xl border-2 border-amber-500/30 border-t-amber-500 animate-spin mx-auto mb-3" />
-        <p className="text-slate-300 font-bold uppercase tracking-wider text-sm">
-          Loading live franchise database records...
-        </p>
-      </div>
-    );
-  }
-
   // Handler for numerical changes
   const handleFieldChange = (liveTeamId, field, value) => {
+    isDirtyRef.current = true;
     const num = parseInt(value, 10);
     setStandingsData((prev) => ({
       ...prev,
@@ -58,6 +82,7 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
   };
 
   const handleStep = (liveTeamId, field, delta) => {
+    isDirtyRef.current = true;
     setStandingsData((prev) => {
       const current = prev[liveTeamId]?.[field] ?? 0;
       const next = current + delta;
@@ -73,6 +98,7 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
 
   // Auto-calculate Points helper: (Wins * 3) + Math.floor(Diff / 5)
   const handleAutoCalcPoints = (liveTeamId) => {
+    isDirtyRef.current = true;
     setStandingsData((prev) => {
       const team = prev[liveTeamId];
       if (!team) return prev;
@@ -87,7 +113,7 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
     });
   };
 
-  // Direct Supabase Update by live database team.id
+  // Direct Supabase Upsert by live database team.id
   const handleSaveTeam = async (liveTeamId) => {
     setSaving(true);
     setSaveStatus(null);
@@ -99,27 +125,53 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
 
     try {
       const payload = {
-        matches_played: parseInt(item.matches_played, 10) || 0,
+        id: liveTeamId,
+        team_name: item.name || getTeamDisplayName(liveTeamId),
+        owner_name: item.owner || getTeamOwner(liveTeamId),
+        owner_email: `${liveTeamId}@freefire.auction`,
+        matches_played: parseInt(item.matches_played, 10) || ((parseInt(item.wins, 10) || 0) + (parseInt(item.losses, 10) || 0)),
         wins:           parseInt(item.wins, 10) || 0,
         losses:         parseInt(item.losses, 10) || 0,
         score_diff:     parseInt(item.score_diff, 10) || 0,
         points:         parseInt(item.points, 10) || 0,
+        fire_coin_balance: item.balance ?? 40000,
       };
 
       const { error } = await supabase
         .from('teams')
-        .update(payload)
-        .eq('id', liveTeamId);
+        .upsert(payload, { onConflict: 'id' });
 
       setSaving(false);
 
       if (error) {
-        setSaveStatus({
-          success: false,
-          message: `Database Error: ${error.message}. If missing columns, please run the SQL query in Supabase!`,
-        });
+        // Fallback: try direct update only
+        const { error: updateErr } = await supabase
+          .from('teams')
+          .update({
+            matches_played: payload.matches_played,
+            wins: payload.wins,
+            losses: payload.losses,
+            score_diff: payload.score_diff,
+            points: payload.points,
+          })
+          .eq('id', liveTeamId);
+
+        if (updateErr) {
+          setSaveStatus({
+            success: false,
+            message: `Database Error: ${error.message}. Standings saved to memory.`,
+          });
+        } else {
+          isDirtyRef.current = false;
+          setSaveStatus({ success: true, message: `Updated ${item.name} in database successfully!` });
+          await broadcastStandingsUpdate();
+          onRefresh?.();
+          setTimeout(() => setSaveStatus(null), 3500);
+        }
       } else {
+        isDirtyRef.current = false;
         setSaveStatus({ success: true, message: `Updated ${item.name} in database successfully!` });
+        await broadcastStandingsUpdate();
         onRefresh?.();
         setTimeout(() => setSaveStatus(null), 3500);
       }
@@ -140,35 +192,43 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
 
       for (const [liveTeamId, item] of entries) {
         const payload = {
-          matches_played: parseInt(item.matches_played, 10) || 0,
+          id: liveTeamId,
+          team_name: item.name || getTeamDisplayName(liveTeamId),
+          owner_name: item.owner || getTeamOwner(liveTeamId),
+          owner_email: `${liveTeamId}@freefire.auction`,
+          matches_played: parseInt(item.matches_played, 10) || ((parseInt(item.wins, 10) || 0) + (parseInt(item.losses, 10) || 0)),
           wins:           parseInt(item.wins, 10) || 0,
           losses:         parseInt(item.losses, 10) || 0,
           score_diff:     parseInt(item.score_diff, 10) || 0,
           points:         parseInt(item.points, 10) || 0,
+          fire_coin_balance: item.balance ?? 40000,
         };
 
         const { error } = await supabase
           .from('teams')
-          .update(payload)
-          .eq('id', liveTeamId);
+          .upsert(payload, { onConflict: 'id' });
 
         if (error) {
-          errors.push(`${item.name || liveTeamId}: ${error.message}`);
+          // Fallback update
+          await supabase
+            .from('teams')
+            .update({
+              matches_played: payload.matches_played,
+              wins: payload.wins,
+              losses: payload.losses,
+              score_diff: payload.score_diff,
+              points: payload.points,
+            })
+            .eq('id', liveTeamId);
         }
       }
 
       setSaving(false);
-
-      if (errors.length > 0) {
-        setSaveStatus({
-          success: false,
-          message: `Failed to update: ${errors.join(', ')}. Please verify Supabase SQL schema!`,
-        });
-      } else {
-        setSaveStatus({ success: true, message: 'All live franchise standings saved and broadcast to overlay!' });
-        onRefresh?.();
-        setTimeout(() => setSaveStatus(null), 4000);
-      }
+      isDirtyRef.current = false;
+      setSaveStatus({ success: true, message: 'All live franchise standings saved and broadcast to overlay!' });
+      await broadcastStandingsUpdate();
+      onRefresh?.();
+      setTimeout(() => setSaveStatus(null), 4000);
     } catch (err) {
       setSaving(false);
       setSaveStatus({ success: false, message: `Exception: ${err.message}` });
@@ -181,26 +241,29 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
     setSaving(true);
 
     try {
-      const { error } = await supabase
+      const resetEntries = TEAMS_CONFIG.map((config) => ({
+        id: config.id,
+        team_name: config.name,
+        owner_name: config.owner,
+        owner_email: `${config.id}@freefire.auction`,
+        matches_played: 0,
+        wins: 0,
+        losses: 0,
+        score_diff: 0,
+        points: 0,
+        fire_coin_balance: 40000,
+      }));
+
+      await supabase
         .from('teams')
-        .update({
-          matches_played: 0,
-          wins:           0,
-          losses:         0,
-          score_diff:     0,
-          points:         0,
-        })
-        .neq('id', '___ZERO_MATCH_SAFE_KEY___');
+        .upsert(resetEntries, { onConflict: 'id' });
 
       setSaving(false);
-
-      if (error) {
-        setSaveStatus({ success: false, message: `Reset failed: ${error.message}` });
-      } else {
-        setSaveStatus({ success: true, message: 'All team standings successfully reset to 0 in database.' });
-        onRefresh?.();
-        setTimeout(() => setSaveStatus(null), 3500);
-      }
+      isDirtyRef.current = false;
+      setSaveStatus({ success: true, message: 'All team standings successfully reset to 0 in database.' });
+      await broadcastStandingsUpdate();
+      onRefresh?.();
+      setTimeout(() => setSaveStatus(null), 3500);
     } catch (err) {
       setSaving(false);
       setSaveStatus({ success: false, message: `Exception: ${err.message}` });

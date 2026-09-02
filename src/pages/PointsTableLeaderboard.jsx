@@ -4,13 +4,15 @@ import { useAllTeams } from '../hooks/useAllTeams';
 import { TEAMS_CONFIG, getTeamDisplayName, getTeamOwner, getTeamLogo } from '../config/teamsConfig';
 
 // ─── DEMONS REIGN ESPORTS POINTS TABLE & LEADERBOARD COMPONENT ────────────────
-export default function PointsTableLeaderboard() {
+export default function PointsTableLeaderboard({ transparentBg: propTransparentBg } = {}) {
   const { teams } = useAllTeams();
-  const [transparentBg, setTransparentBg] = useState(false);
+  const [internalTransparentBg, setInternalTransparentBg] = useState(false);
+  const transparentBg = propTransparentBg !== undefined ? propTransparentBg : internalTransparentBg;
+  const setTransparentBg = setInternalTransparentBg;
 
   // Merge live database teams with configuration and stats
   const activeTeamsList = (teams && teams.length > 0 ? teams : TEAMS_CONFIG).map((t, idx) => {
-    const config = TEAMS_CONFIG.find((c) => c.id === t.id) || TEAMS_CONFIG[idx] || {};
+    const config = getTeamConfig(t.id) || TEAMS_CONFIG.find((c) => c.id === t.id) || TEAMS_CONFIG[idx] || {};
     const teamId = t.id || config.id;
     const displayName = getTeamDisplayName(teamId, t.team_name || t.name || config.name);
     const ownerName = getTeamOwner(teamId, t.owner_name || t.owner || config.owner);
@@ -20,7 +22,7 @@ export default function PointsTableLeaderboard() {
     const wins = typeof t.wins === 'number' ? t.wins : defaultStats.wins;
     const losses = typeof t.losses === 'number' ? t.losses : defaultStats.losses;
     const rawDiff = t.score_diff ?? t.diff ?? defaultStats.diff;
-    const diffNum = typeof rawDiff === 'string' ? parseInt(rawDiff.replace('+', ''), 10) || 0 : (rawDiff || 0);
+    const diffNum = typeof rawDiff === 'string' ? parseInt(rawDiff.replace('+', ''), 10) || 0 : (Number(rawDiff) || 0);
     const pts = typeof t.points === 'number' ? t.points : (typeof t.pts === 'number' ? t.pts : defaultStats.pts);
     const balance = t.fire_coin_balance ?? 40000;
 
