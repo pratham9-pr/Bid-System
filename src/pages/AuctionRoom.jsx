@@ -142,8 +142,20 @@ export default function AuctionRoom() {
             </div>
           ) : error ? (
             <div className="flex-1 flex items-center justify-center">
-              <div className="card p-8 text-center max-w-md">
-                <p className="text-red-400 font-inter text-sm">{error}</p>
+              <div className="p-8 text-center max-w-md rounded-2xl bg-surface-800/90 border border-red-500/30 shadow-2xl backdrop-blur-md">
+                <div className="w-12 h-12 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-xl mx-auto mb-3">
+                  ⚠️
+                </div>
+                <h3 className="font-rajdhani font-black text-lg text-white uppercase tracking-wider mb-2">
+                  Connection Notice
+                </h3>
+                <p className="text-slate-300 font-inter text-xs mb-5 leading-relaxed">{error}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="btn-primary px-5 py-2 text-xs font-rajdhani font-bold uppercase tracking-wider shadow-lg cursor-pointer"
+                >
+                  ↻ Retry Connection
+                </button>
               </div>
             </div>
           ) : (

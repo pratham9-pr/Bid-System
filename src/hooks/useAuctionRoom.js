@@ -29,6 +29,7 @@ export function useAuctionRoom(teamId) {
   teamIdRef.current = teamId;
 
   // Helper to fetch full player doc — returns null for captains (not biddable)
+  // Helper to fetch full player doc — returns null for captains (not biddable)
   const fetchPlayer = async (id) => {
     if (!id) {
       setActivePlayer(null);
@@ -37,56 +38,64 @@ export function useAuctionRoom(teamId) {
     const cleanId = String(id).trim();
     let data = null;
 
-    if (cleanId && cleanId !== 'current' && cleanId !== 'undefined' && cleanId !== 'null') {
-      const { data: pData } = await supabase
-        .from('players')
-        .select('*')
-        .eq('id', cleanId)
-        .maybeSingle();
-      data = pData;
-    }
+    try {
+      if (cleanId && cleanId !== 'current' && cleanId !== 'undefined' && cleanId !== 'null') {
+        const { data: pData } = await supabase
+          .from('players')
+          .select('*')
+          .eq('id', cleanId)
+          .maybeSingle();
+        data = pData;
+      }
 
-    if (!data) {
-      const { data: actData } = await supabase
-        .from('players')
-        .select('*')
-        .eq('status', 'active')
-        .limit(1)
-        .maybeSingle();
-      data = actData;
-    }
+      if (!data) {
+        const { data: actData } = await supabase
+          .from('players')
+          .select('*')
+          .eq('status', 'active')
+          .limit(1)
+          .maybeSingle();
+        data = actData;
+      }
 
-    if (data && !data.is_captain) {
-      setActivePlayer((prev) => {
-        // If local state already has newer/same bid, preserve it
-        if (prev && String(prev.id) === String(data.id) && Number(prev.current_bid ?? 0) > Number(data.current_bid ?? 0)) {
-          return { ...data, ...prev };
-        }
-        return data;
-      });
-      setActivePlayerId(data.id);
-      activePlayerIdRef.current = data.id;
-    } else if (!data) {
-      setActivePlayer(null);
+      if (data && !data.is_captain) {
+        setActivePlayer((prev) => {
+          // If local state already has newer/same bid, preserve it
+          if (prev && String(prev.id) === String(data.id) && Number(prev.current_bid ?? 0) > Number(data.current_bid ?? 0)) {
+            return { ...data, ...prev };
+          }
+          return data;
+        });
+        setActivePlayerId(data.id);
+        activePlayerIdRef.current = data.id;
+      } else if (!data) {
+        setActivePlayer(null);
+      }
+    } catch (err) {
+      console.warn('fetchPlayer warning:', err);
     }
   };
 
   // Helper to fetch team doc
   const fetchTeam = async (id) => {
     if (!id) return;
-    const { data } = await supabase
-      .from('teams')
-      .select('*')
-      .eq('id', String(id))
-      .maybeSingle();
+    try {
+      const { data } = await supabase
+        .from('teams')
+        .select('*')
+        .eq('id', String(id))
+        .maybeSingle();
 
-    if (data) {
-      let bal = typeof data.fire_coin_balance === 'number' ? data.fire_coin_balance : 40000;
-      if (bal > 40000) {
-        const spent = Math.max(0, 50000 - bal);
-        bal = Math.max(0, 40000 - spent);
+      if (data) {
+        let bal = typeof data.fire_coin_balance === 'number' ? data.fire_coin_balance : 40000;
+        if (bal > 40000) {
+          const spent = Math.max(0, 50000 - bal);
+          bal = Math.max(0, 40000 - spent);
+        }
+        setTeam({ ...data, fire_coin_balance: bal });
       }
-      setTeam({ ...data, fire_coin_balance: bal });
+    } catch (err) {
+      console.warn('fetchTeam warning:', err);
     }
   };
 
@@ -153,7 +162,14 @@ export function useAuctionRoom(teamId) {
           await fetchTeam(teamId);
         }
       } catch (err) {
-        if (isMounted) setError(err.message);
+        if (isMounted) {
+          const isFetchError = err?.message?.includes('Failed to fetch') || err?.name === 'TypeError';
+          setError(
+            isFetchError
+              ? 'Unable to connect to live auction database. Please check your network connection or Supabase settings.'
+              : (err.message || 'Error connecting to auction floor.')
+          );
+        }
       } finally {
         if (isMounted) setLoading(false);
       }

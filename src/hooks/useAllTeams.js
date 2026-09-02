@@ -88,7 +88,12 @@ export function useAllTeams() {
       setError(null);
     } catch (err) {
       console.warn('useAllTeams fetch error:', err);
-      setError(err.message);
+      const isFetchError = err?.message?.includes('Failed to fetch') || err?.name === 'TypeError';
+      setError(
+        isFetchError
+          ? 'Unable to connect to team database. Using cached franchise data.'
+          : (err.message || 'Error loading teams.')
+      );
     } finally {
       setLoading(false);
     }

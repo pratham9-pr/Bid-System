@@ -37,7 +37,13 @@ export function useAllPlayers() {
 
       setPlayers(deduplicated);
     } catch (err) {
-      setError(err.message);
+      console.warn('useAllPlayers fetch warning:', err);
+      const isFetchError = err?.message?.includes('Failed to fetch') || err?.name === 'TypeError';
+      setError(
+        isFetchError
+          ? 'Unable to connect to player database. Operating with offline data.'
+          : (err.message || 'Error loading players.')
+      );
     } finally {
       setLoading(false);
     }

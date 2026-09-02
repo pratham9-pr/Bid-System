@@ -82,7 +82,12 @@ export function Login({ onSuccess }) {
       onSuccess?.(user);
       navigate(user.redirect || (isAdminRole ? '/admin' : '/bidder'));
     } catch (err) {
-      setError(err.message || 'Invalid Password / Access Denied');
+      const isFetchError = err?.message?.includes('Failed to fetch') || err?.name === 'TypeError';
+      setError(
+        isFetchError
+          ? 'Unable to connect to database server. Please check your internet connection or Supabase settings.'
+          : (err.message || 'Invalid Password / Access Denied')
+      );
     } finally {
       setLoading(false);
     }

@@ -146,7 +146,12 @@ export function AddPlayerForm({ onSuccess }) {
     } catch (error) {
       console.error('Detailed Fetch Error:', error);
       setLoading(false);
-      setSubmitError(error?.message || 'TypeError: Failed to fetch. Check developer console for CORS/network failure.');
+      const isFetchError = error?.message?.includes('Failed to fetch') || error?.name === 'TypeError';
+      setSubmitError(
+        isFetchError
+          ? 'Unable to connect to database server. Please check your internet connection or backend configuration.'
+          : (error?.message || 'Failed to add player.')
+      );
     }
   };
 
