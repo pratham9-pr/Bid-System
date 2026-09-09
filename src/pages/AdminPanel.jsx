@@ -406,7 +406,7 @@ export default function AdminPanel() {
                       <option value="" disabled className="bg-surface-900 text-muted">
                         — Select a Franchise Team —
                       </option>
-                      {(teams.length > 0 ? teams : TEAMS_CONFIG)
+                      {(teams || [])
                         .filter((t) => t.isPending !== true)
                         .map((t) => (
                           <option key={t.id} value={t.id} className="bg-surface-900 text-white font-rajdhani font-bold">

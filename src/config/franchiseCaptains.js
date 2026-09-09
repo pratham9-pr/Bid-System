@@ -11,151 +11,30 @@ import { TEAMS_CONFIG } from './teamsConfig';
 export const MAX_ROSTER_SIZE = 4;
 export const MAX_AUCTION_SLOTS = 3;
 
-/** Permanent Franchise Captains Definition */
-export const PERMANENT_CAPTAINS = {
-  alpha_wolves: {
-    name: 'NX4 SILENT',
-    in_game_name: 'NX4 SILENT',
-    role: 'IGL',
-    base_price: 0,
-    current_bid: 0,
-    sold_price: 0,
-    max_limit: 30000,
-    photo_url: '/power-hawks.png',
-    custom_card_url: '/power-hawks.png',
-    image_url: '/power-hawks.png',
-    is_captain: true,
-    is_locked: true,
-    status: 'captain',
-    team_id: 'alpha_wolves',
-    team_name: 'POWER HAWKS',
-  },
-  beta_strikers: {
-    name: 'MOKSHII FF',
-    in_game_name: 'MOKSHII FF',
-    role: 'IGL',
-    base_price: 0,
-    current_bid: 0,
-    sold_price: 0,
-    max_limit: 30000,
-    photo_url: '/team-vortex.png',
-    custom_card_url: '/team-vortex.png',
-    image_url: '/team-vortex.png',
-    is_captain: true,
-    is_locked: true,
-    status: 'captain',
-    team_id: 'beta_strikers',
-    team_name: 'TEAM VORTEX',
-  },
-  gamma_reapers: {
-    name: 'invincible',
-    in_game_name: 'invincible',
-    role: 'IGL',
-    base_price: 0,
-    current_bid: 0,
-    sold_price: 0,
-    max_limit: 30000,
-    photo_url: '/abyssal-ebon.png',
-    custom_card_url: '/abyssal-ebon.png',
-    image_url: '/abyssal-ebon.png',
-    is_captain: true,
-    is_locked: true,
-    status: 'captain',
-    team_id: 'gamma_reapers',
-    team_name: 'ABYSSAL EBON',
-  },
-  delta_phantoms: {
-    name: 'RX KAUSHII',
-    in_game_name: 'RX KAUSHII',
-    role: 'IGL',
-    base_price: 0,
-    current_bid: 0,
-    sold_price: 0,
-    max_limit: 30000,
-    photo_url: '/rx-kudla.png',
-    custom_card_url: '/rx-kudla.png',
-    image_url: '/rx-kudla.png',
-    is_captain: true,
-    is_locked: true,
-    status: 'captain',
-    team_id: 'delta_phantoms',
-    team_name: 'RX KUDLA',
-  },
-};
+/** Permanent Franchise Captains Definition (Dynamic) */
+export const PERMANENT_CAPTAINS = {};
 
 /** Returns true if given name matches any permanent captain */
 export function isPermanentCaptainName(name) {
   if (!name) return false;
   const clean = String(name).toLowerCase().trim();
-  return (
-    clean === 'nx4 silent' ||
-    clean === 'mokshii ff' ||
-    clean === 'invincible' ||
-    clean === 'rx kaushii' ||
-    clean === 'nx4_silent' ||
-    clean === 'mokshii_ff' ||
-    clean === 'rx_kaushii'
-  );
+  return Object.values(PERMANENT_CAPTAINS).some(c => c.name?.toLowerCase() === clean);
 }
 
 /** Returns the captain configuration for a team */
 export function getCaptainForTeam(teamId) {
   if (!teamId) return null;
-  const clean = String(teamId).toLowerCase().trim();
-  if (clean === 'alpha_wolves' || clean === 'team_alpha' || clean === 'alpha' || clean === '1' || clean === 'power hawks' || clean === 'power_hawks') {
-    return PERMANENT_CAPTAINS.alpha_wolves;
-  }
-  if (clean === 'beta_strikers' || clean === 'team_beta' || clean === 'beta' || clean === '2' || clean === 'team vortex' || clean === 'team_vortex' || clean === 'vortex') {
-    return PERMANENT_CAPTAINS.beta_strikers;
-  }
-  if (
-    clean === 'gamma_reapers' ||
-    clean === 'team_gamma' ||
-    clean === 'gamma' ||
-    clean === '3' ||
-    clean === 'abyssal ebon' ||
-    clean === 'abyssal_ebon' ||
-    clean === 'abyssal' ||
-    clean === 'ebon'
-  ) {
-    return PERMANENT_CAPTAINS.gamma_reapers;
-  }
-  if (
-    clean === 'delta_phantoms' ||
-    clean === 'team_delta' ||
-    clean === 'delta' ||
-    clean === '4' ||
-    clean === 'rx kudla' ||
-    clean === 'rx_kudla' ||
-    clean === 'rx' ||
-    clean === 'kudla'
-  ) {
-    return PERMANENT_CAPTAINS.delta_phantoms;
-  }
-  return null;
+  return PERMANENT_CAPTAINS[teamId] || null;
 }
 
-/** Robust Helper to check if a player belongs to a given team ID (handles aliases, integers, case insensitivity) */
+/** Robust Helper to check if a player belongs to a given team ID */
 export function isPlayerAssignedToTeam(player, targetTeamId) {
   if (!player || !targetTeamId) return false;
   const tId = String(targetTeamId).toLowerCase().trim();
-  const config = TEAMS_CONFIG.find(c => c.id === tId || c.aliases?.includes(tId));
-
-  const validKeys = new Set(
-    [
-      tId,
-      config?.id,
-      ...(config?.aliases || []),
-      config?.name?.toLowerCase(),
-    ]
-      .filter(Boolean)
-      .map((s) => String(s).toLowerCase().trim())
-  );
-
   const pSoldTo = String(player.sold_to_team_id || player.team_id || '').toLowerCase().trim();
   const pHighest = String(player.current_highest_bidder || '').toLowerCase().trim();
 
-  return (pSoldTo && validKeys.has(pSoldTo)) || (pHighest && validKeys.has(pHighest));
+  return pSoldTo === tId || pHighest === tId;
 }
 
 /**

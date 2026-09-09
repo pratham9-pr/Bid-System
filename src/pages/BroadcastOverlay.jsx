@@ -5,7 +5,7 @@ import { useAuctionRoom } from '../hooks/useAuctionRoom';
 import { useAllTeams } from '../hooks/useAllTeams';
 import { useAllPlayers } from '../hooks/useAllPlayers';
 import { PlayerRevealCard } from '../components/PlayerRevealCard';
-import { getTeamDisplayName, getTeamOwner, getTeamLogo, TEAMS_CONFIG } from '../config/teamsConfig';
+import { getTeamDisplayName, getTeamOwner, getTeamLogo, getTeamTheme, TEAMS_CONFIG } from '../config/teamsConfig';
 import { getTeamFullRoster } from '../config/franchiseCaptains';
 import { MAX_BID_LIMIT } from '../services/auctionService';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
@@ -71,44 +71,15 @@ function SoldOutStamp({ winnerName, winningBid }) {
 
 // ─── Vertical Franchise Roster Card (Sidebar Column Item) ─────────────────────
 function FranchiseSidebarCard({ teamId, teams, players }) {
-  const teamConfig = TEAMS_CONFIG.find((t) => t.id === teamId) || {};
   const teamRecord = (teams || []).find((t) => String(t.id).toLowerCase() === String(teamId).toLowerCase()) || {};
 
-  const cleanName = String(teamRecord.team_name || teamRecord.name || teamConfig.name || teamId || '').toLowerCase();
-  const displayName = getTeamDisplayName(teamId, teamRecord.team_name || teamRecord.name || teamConfig.name);
-  const ownerName = getTeamOwner(teamId, teamRecord.owner_name || teamRecord.owner || teamConfig.owner);
+  const displayName = getTeamDisplayName(teamId, teamRecord.team_name || teamRecord.name);
+  const ownerName = getTeamOwner(teamId, teamRecord.owner_name || teamRecord.owner);
   const logoUrl = getTeamLogo(teamId);
   const balance = teamRecord.fire_coin_balance ?? 40000;
 
-  const isPower = cleanName.includes('alpha') || cleanName.includes('power');
-  const isVortex = cleanName.includes('beta') || cleanName.includes('vortex');
-  const isAbyssal = cleanName.includes('gamma') || cleanName.includes('abyssal') || cleanName.includes('ebon');
-
   const { slots = [null, null, null, null], totalCount = 0, remainingSlots = 4, isFull = false } = getTeamFullRoster(teamId, players);
-
-  const themeClasses = isPower
-    ? {
-        card: 'bg-gradient-to-b from-amber-950/50 via-surface-900/90 to-surface-900/95 border-amber-500/30 shadow-[0_0_25px_rgba(245,158,11,0.15)]',
-        accentText: 'text-amber-400',
-        badge: 'bg-amber-400',
-      }
-    : isVortex
-    ? {
-        card: 'bg-gradient-to-b from-sky-950/50 via-surface-900/90 to-surface-900/95 border-sky-500/30 shadow-[0_0_25px_rgba(14,165,233,0.15)]',
-        accentText: 'text-sky-400',
-        badge: 'bg-sky-400',
-      }
-    : isAbyssal
-    ? {
-        card: 'bg-gradient-to-b from-emerald-950/50 via-surface-900/90 to-surface-900/95 border-emerald-500/30 shadow-[0_0_25px_rgba(16,185,129,0.15)]',
-        accentText: 'text-emerald-400',
-        badge: 'bg-emerald-400',
-      }
-    : {
-        card: 'bg-gradient-to-b from-purple-950/50 via-surface-900/90 to-surface-900/95 border-purple-500/30 shadow-[0_0_25px_rgba(168,85,247,0.15)]',
-        accentText: 'text-purple-400',
-        badge: 'bg-purple-400',
-      };
+  const themeClasses = getTeamTheme(teamId);
 
   return (
     <div
@@ -380,10 +351,11 @@ export default function BroadcastOverlay() {
         </div>
       ) : (
         <div className="flex-1 w-full p-2 sm:p-3 lg:p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-3.5 min-h-0 overflow-hidden relative z-10">
-          {/* ── LEFT SIDEBAR (25% Width / Col 3): POWER HAWKS & ABYSSAL EBON ── */}
+          {/* ── LEFT SIDEBAR (25% Width / Col 3): Dynamic First Half of Franchises ── */}
           <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
-            <FranchiseSidebarCard teamId="alpha_wolves" teams={teams} players={players} />
-            <FranchiseSidebarCard teamId="gamma_reapers" teams={teams} players={players} />
+            {teams.slice(0, Math.max(1, Math.ceil(teams.length / 2))).map((team, idx) => (
+              <FranchiseSidebarCard key={team.id || idx} teamId={team.id} teams={teams} players={players} />
+            ))}
           </aside>
 
           {/* ── CENTER STAGE (50% Width / Col 6): FULL-BLEED ACTIVE PLAYER CARD & HUD ── */}
@@ -471,10 +443,11 @@ export default function BroadcastOverlay() {
             </div>
           </main>
 
-          {/* ── RIGHT SIDEBAR (25% Width / Col 3): TEAM VORTEX & RX KUDLA ───── */}
+          {/* ── RIGHT SIDEBAR (25% Width / Col 3): Dynamic Second Half of Franchises ───── */}
           <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
-            <FranchiseSidebarCard teamId="beta_strikers" teams={teams} players={players} />
-            <FranchiseSidebarCard teamId="delta_phantoms" teams={teams} players={players} />
+            {teams.slice(Math.max(1, Math.ceil(teams.length / 2))).map((team, idx) => (
+              <FranchiseSidebarCard key={team.id || idx} teamId={team.id} teams={teams} players={players} />
+            ))}
           </aside>
         </div>
       )}

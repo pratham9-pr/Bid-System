@@ -25,20 +25,9 @@ export function useAllTeams() {
 
       const existingRows = teamRows || [];
 
-      // Guarantee all 4 franchise teams from TEAMS_CONFIG are always represented
-      const mergedTeams = TEAMS_CONFIG.map((config, idx) => {
-        const found = existingRows.find((r) => {
-          const rId = String(r.id || '').toLowerCase().trim();
-          const rName = String(r.team_name || r.name || '').toLowerCase().trim();
-          return (
-            rId === config.id ||
-            config.aliases?.includes(rId) ||
-            rName === config.name.toLowerCase() ||
-            config.aliases?.some((a) => rName.includes(a))
-          );
-        }) || {};
-
-        const teamId = found.id || config.id;
+      // Dynamically map over teams fetched from the database
+      const mergedTeams = existingRows.map((found, idx) => {
+        const teamId = found.id || `team_${idx + 1}`;
         const teamDrafted = (playersData || []).filter(
           (p) =>
             p.status === 'sold' &&
@@ -46,24 +35,25 @@ export function useAllTeams() {
             isPlayerAssignedToTeam(p, teamId)
         );
         const spent = teamDrafted.reduce((sum, p) => sum + (p.sold_price || p.current_bid || 0), 0);
-        const balance = Math.max(0, 40000 - spent);
+        const startingPurse = found.purse ?? found.fire_coin_balance ?? 40000;
+        const balance = Math.max(0, startingPurse - spent);
 
-        const defaultStats = config.defaultStats || { wins: 0, losses: 0, diff: 0, pts: 0 };
         const rawDiff = found.score_diff ?? found.diff;
         const diffNum = rawDiff != null
           ? (typeof rawDiff === 'string' ? parseInt(rawDiff.replace('+', ''), 10) || 0 : Number(rawDiff) || 0)
-          : (typeof defaultStats.diff === 'string' ? parseInt(defaultStats.diff.replace('+', ''), 10) || 0 : (defaultStats.diff || 0));
+          : 0;
 
-        const winsNum = typeof found.wins === 'number' ? found.wins : defaultStats.wins;
-        const lossesNum = typeof found.losses === 'number' ? found.losses : defaultStats.losses;
+        const winsNum = typeof found.wins === 'number' ? found.wins : 0;
+        const lossesNum = typeof found.losses === 'number' ? found.losses : 0;
         const ptsNum = typeof found.points === 'number'
           ? found.points
-          : (typeof found.pts === 'number' ? found.pts : defaultStats.pts);
+          : (typeof found.pts === 'number' ? found.pts : 0);
 
         return {
+          ...found,
           id: teamId,
-          team_name: found.team_name || found.name || config.name,
-          owner_name: found.owner_name || found.owner || config.owner,
+          team_name: found.team_name || found.name || `Team ${idx + 1}`,
+          owner_name: found.owner_name || found.owner || 'Franchise Owner',
           owner_email: found.owner_email || `${teamId}@tournament.auction`,
           matches_played: typeof found.matches_played === 'number'
             ? found.matches_played
@@ -75,12 +65,7 @@ export function useAllTeams() {
           points: ptsNum,
           pts: ptsNum,
           fire_coin_balance: balance,
-          logo: getTeamLogo(teamId),
-          ...found,
-          id: teamId,
-          score_diff: diffNum,
-          diff: diffNum,
-          fire_coin_balance: balance,
+          logo: found.logo_url || found.logo || getTeamLogo(teamId),
         };
       });
 

@@ -28,40 +28,28 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
     if (isDirtyRef.current) return;
 
     const matrix = {};
-    TEAMS_CONFIG.forEach((config) => {
-      const liveTeam = (teams || []).find((t) => {
-        const tId = String(t.id || '').toLowerCase().trim();
-        const tName = String(t.team_name || t.name || '').toLowerCase().trim();
-        return (
-          tId === config.id ||
-          config.aliases?.includes(tId) ||
-          tName === config.name.toLowerCase() ||
-          config.aliases?.some((a) => tName.includes(a))
-        );
-      });
-
-      const liveId = config.id;
-      const rawDiff = liveTeam?.score_diff ?? liveTeam?.diff ?? config.defaultStats?.diff ?? 0;
+    (teams || []).forEach((team) => {
+      const liveId = team.id;
+      const rawDiff = team.score_diff ?? team.diff ?? 0;
       const numDiff = typeof rawDiff === 'string' ? parseInt(rawDiff.replace('+', ''), 10) || 0 : (Number(rawDiff) || 0);
 
-      const defaultStats = config.defaultStats || { wins: 0, losses: 0, diff: 0, pts: 0 };
-      const wins = typeof liveTeam?.wins === 'number' ? liveTeam.wins : defaultStats.wins;
-      const losses = typeof liveTeam?.losses === 'number' ? liveTeam.losses : defaultStats.losses;
-      const points = typeof liveTeam?.points === 'number'
-        ? liveTeam.points
-        : (typeof liveTeam?.pts === 'number' ? liveTeam.pts : defaultStats.pts);
+      const wins = typeof team.wins === 'number' ? team.wins : 0;
+      const losses = typeof team.losses === 'number' ? team.losses : 0;
+      const points = typeof team.points === 'number'
+        ? team.points
+        : (typeof team.pts === 'number' ? team.pts : 0);
 
       matrix[liveId] = {
         id: liveId,
-        name: getTeamDisplayName(liveId, liveTeam?.team_name || liveTeam?.name || config.name),
-        owner: getTeamOwner(liveId, liveTeam?.owner_name || liveTeam?.owner || config.owner),
-        logo: getTeamLogo(liveId),
-        matches_played: Number(liveTeam?.matches_played ?? (wins + losses)),
+        name: getTeamDisplayName(liveId, team.team_name || team.name),
+        owner: getTeamOwner(liveId, team.owner_name || team.owner),
+        logo: team.logo_url || team.logo || getTeamLogo(liveId),
+        matches_played: Number(team.matches_played ?? (wins + losses)),
         wins: Number(wins),
         losses: Number(losses),
         score_diff: numDiff,
         points: Number(points),
-        balance: liveTeam?.fire_coin_balance ?? 40000,
+        balance: team.fire_coin_balance ?? 40000,
       };
     });
 
@@ -241,11 +229,11 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
     setSaving(true);
 
     try {
-      const resetEntries = TEAMS_CONFIG.map((config) => ({
-        id: config.id,
-        team_name: config.name,
-        owner_name: config.owner,
-        owner_email: `${config.id}@tournament.auction`,
+      const resetEntries = (teams || []).map((team) => ({
+        id: team.id,
+        team_name: team.team_name || team.name,
+        owner_name: team.owner_name || team.owner,
+        owner_email: team.owner_email || `${team.id}@tournament.auction`,
         matches_played: 0,
         wins: 0,
         losses: 0,

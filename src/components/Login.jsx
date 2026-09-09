@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { TEAMS_CONFIG } from '../config/teamsConfig';
+import { useTournamentContext } from '../context/TournamentContext';
+import { supabase } from '../config/supabase';
+import { getTeamTheme } from '../config/teamsConfig';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const LockIcon = () => (
@@ -41,17 +44,65 @@ const ShieldCheckIcon = () => (
 export function Login({ onSuccess }) {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { tournament, loading: tournamentLoading } = useTournamentContext();
 
-  // ── Two-Step State: null (Selection Phase) or role string (Password Phase) ──
-  const [selectedRole, setSelectedRole] = useState(null);
-  const [password,     setPassword]     = useState('');
-  const [showPw,       setShowPw]       = useState(false);
-  const [loading,      setLoading]      = useState(false);
-  const [error,        setError]        = useState('');
+  const [teams,         setTeams]         = useState([]);
+  const [teamsLoading,  setTeamsLoading]  = useState(true);
+  const [selectedRole,  setSelectedRole]  = useState(null);
+  const [password,      setPassword]      = useState('');
+  const [showPw,        setShowPw]        = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState('');
+
+  // ── Fetch dynamic teams strictly from database for the active tournament ────
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadTeams() {
+      setTeamsLoading(true);
+      try {
+        if (!tournament || !tournament.id) {
+          if (isMounted) {
+            setTeams([]);
+            setTeamsLoading(false);
+          }
+          return;
+        }
+
+        const { data, error: teamsErr } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('tournament_id', tournament.id)
+          .order('name', { ascending: true });
+
+        if (isMounted) {
+          if (!teamsErr && data && data.length > 0) {
+            setTeams(data);
+          } else {
+            setTeams([]);
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching tournament franchises:', err);
+        if (isMounted) setTeams([]);
+      } finally {
+        if (isMounted) setTeamsLoading(false);
+      }
+    }
+
+    loadTeams();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [tournament?.id]);
 
   // Selected Team metadata
-  const currentTeam = TEAMS_CONFIG.find((t) => t.id === selectedRole);
+  const currentTeam = teams.find((t) => t.id === selectedRole);
   const isAdminRole = selectedRole === 'admin';
+  const currentTeamName = currentTeam ? (currentTeam.team_name || currentTeam.name) : 'Team';
+  const currentTeamOwner = currentTeam ? (currentTeam.owner_name || currentTeam.owner) : 'Owner';
+  const currentTeamLogo = currentTeam?.logo_url || currentTeam?.logo || PLATFORM_CONFIG.logoFallback;
 
   const handleSelectRole = (roleId) => {
     setSelectedRole(roleId);
@@ -111,71 +162,107 @@ export function Login({ onSuccess }) {
               </p>
             </div>
             <span className="text-[10px] font-rajdhani font-bold px-2.5 py-0.5 rounded-full bg-surface-700/50 text-slate-400 border border-surface-500/40 uppercase self-start sm:self-auto">
-              4 Active Teams
+              {teams.length} {teams.length === 1 ? 'Active Team' : 'Active Teams'}
             </span>
           </div>
 
-          {/* Expansive 2x2 Team Grid (1-column on mobile, 2-column on sm+) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {TEAMS_CONFIG.map((t) => {
-              const isPending = t.isPending === true;
-              return (
+          {/* Dynamic Franchise Grid / Empty State Logic */}
+          {teamsLoading || tournamentLoading ? (
+            <div className="p-8 sm:p-12 rounded-2xl border border-white/10 bg-surface-900/60 backdrop-blur-xl flex flex-col items-center justify-center gap-3">
+              <div className="w-8 h-8 rounded-full border-2 border-amber-500/30 border-t-amber-500 animate-spin" />
+              <span className="text-xs font-rajdhani font-bold text-slate-400 uppercase tracking-widest">
+                Loading Tournament Franchises…
+              </span>
+            </div>
+          ) : !tournament?.id || teams.length === 0 ? (
+            /* ── Glassmorphism Empty State ────────────────────────────────── */
+            <div className="p-8 sm:p-10 rounded-2xl border border-white/10 bg-surface-900/60 backdrop-blur-xl text-center space-y-4 shadow-2xl animate-fade-in">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(245,158,11,0.15)]">
+                🏆
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="font-rajdhani font-black text-lg sm:text-xl text-white uppercase tracking-wider">
+                  No Franchises Active
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-400 font-inter max-w-sm mx-auto leading-relaxed">
+                  No franchises active. Please configure a tournament in the Host Panel
+                </p>
+              </div>
+              <div className="pt-2">
                 <button
-                  key={t.id}
                   type="button"
-                  onClick={() => !isPending && handleSelectRole(t.id)}
-                  disabled={isPending}
-                  className={`relative overflow-hidden group p-4 sm:p-5 rounded-2xl border min-h-[110px] sm:min-h-[130px]
-                             transition-all duration-300 text-left flex flex-col justify-between
-                             ${isPending ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:scale-[1.02] active:scale-[0.98] cursor-pointer hover:shadow-2xl'}
-                             ${t.color}`}
+                  onClick={() => handleSelectRole('admin')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-rajdhani font-bold uppercase tracking-wider bg-gold-500/20 border border-gold-500/40 text-gold-300 hover:bg-gold-500/30 hover:border-gold-500/60 hover:shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all cursor-pointer"
                 >
-                  {/* ── Background Watermark Logo (15% - 25% Opacity) ──── */}
-                  <img
-                    src={t.logo}
-                    alt=""
-                    aria-hidden="true"
-                    onError={(e) => {
-                      if (t.fallbackLogo && e.currentTarget.src !== t.fallbackLogo) {
-                        e.currentTarget.src = t.fallbackLogo;
-                      }
-                    }}
-                    className="absolute right-0 bottom-0 w-28 h-28 sm:w-36 sm:h-36 object-cover opacity-15 pointer-events-none z-0 mix-blend-screen transition-transform duration-500 group-hover:scale-115 group-hover:opacity-25 translate-x-3 translate-y-3"
-                  />
+                  <span>👑</span>
+                  <span>Configure Tournament</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* ── Dynamic Database Teams Grid ────────────────────────────── */
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {teams.map((t, idx) => {
+                const theme = getTeamTheme(idx);
+                const teamName = t.team_name || t.name || `Team ${idx + 1}`;
+                const ownerName = t.owner_name || t.owner || 'Franchise Owner';
+                const shortCode = (t.short_name || teamName || 'FR').substring(0, 3).toUpperCase();
+                const purse = Number(t.purse ?? t.fire_coin_balance ?? 40000).toLocaleString('en-IN');
+                const logo = t.logo_url || t.logo || PLATFORM_CONFIG.logoFallback;
 
-                  {/* ── Top Row: Mascot Emblem Thumbnail & Short code ─── */}
-                  <div className="relative z-10 flex items-center justify-between gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-lg group-hover:border-white/50 transition-colors">
-                      <img
-                        src={t.logo}
-                        alt={t.name}
-                        className="w-full h-full object-cover rounded-full"
-                        onError={(e) => { e.currentTarget.src = '/logo.png'; }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-rajdhani font-black px-2 py-0.5 rounded-md bg-black/50 border border-white/10 text-slate-300 tracking-wider">
-                      {t.shortName || 'FF'}
-                    </span>
-                  </div>
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => handleSelectRole(t.id)}
+                    className={`relative overflow-hidden group p-4 sm:p-5 rounded-2xl border min-h-[110px] sm:min-h-[130px]
+                               transition-all duration-300 text-left flex flex-col justify-between
+                               hover:scale-[1.02] active:scale-[0.98] cursor-pointer hover:shadow-2xl
+                               ${theme.color}`}
+                  >
+                    {/* Watermark Logo */}
+                    <img
+                      src={logo}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute right-0 bottom-0 w-28 h-28 sm:w-36 sm:h-36 object-cover opacity-15 pointer-events-none z-0 mix-blend-screen transition-transform duration-500 group-hover:scale-115 group-hover:opacity-25 translate-x-3 translate-y-3"
+                      onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
+                    />
 
-                  {/* ── Bottom Row: Team Name & Owner ─────────────────── */}
-                  <div className="relative z-10 mt-3">
-                    <h3 className="font-rajdhani font-black text-base sm:text-lg tracking-wider uppercase text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover:text-amber-300 transition-colors">
-                      {t.name}
-                    </h3>
-                    <div className="flex items-center justify-between gap-2 mt-1">
-                      <p className="text-[11px] text-slate-300 font-inter truncate">
-                        {isPending ? '🔒 Inactive' : `Owner: ${t.owner}`}
-                      </p>
-                      <span className="text-[10px] font-rajdhani font-bold text-gold-400/90 whitespace-nowrap">
-                        ₣40,000 FC
+                    {/* Top Row: Thumbnail & Short Code */}
+                    <div className="relative z-10 flex items-center justify-between gap-3">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-lg group-hover:border-white/50 transition-colors">
+                        <img
+                          src={logo}
+                          alt={teamName}
+                          className="w-full h-full object-cover rounded-full"
+                          onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-rajdhani font-black px-2 py-0.5 rounded-md bg-black/50 border border-white/10 text-slate-300 tracking-wider">
+                        {shortCode}
                       </span>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+
+                    {/* Bottom Row: Team Name & Owner */}
+                    <div className="relative z-10 mt-3">
+                      <h3 className="font-rajdhani font-black text-base sm:text-lg tracking-wider uppercase text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover:text-amber-300 transition-colors truncate">
+                        {teamName}
+                      </h3>
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <p className="text-[11px] text-slate-300 font-inter truncate">
+                          Owner: {ownerName}
+                        </p>
+                        <span className="text-[10px] font-rajdhani font-bold text-gold-400/90 whitespace-nowrap">
+                          ₹{purse}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Prominent Host / Admin Access Button */}
           <div className="pt-4 border-t border-surface-600/40">
@@ -240,10 +327,10 @@ export function Login({ onSuccess }) {
                 <span className="text-2xl">👑</span>
               ) : (
                 <img
-                  src={currentTeam?.logo}
-                  alt={currentTeam?.name}
+                  src={currentTeamLogo}
+                  alt={currentTeamName}
                   className="w-full h-full object-cover rounded-full"
-                  onError={(e) => { e.currentTarget.src = '/logo.png'; }}
+                  onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
                 />
               )}
             </div>
@@ -252,10 +339,10 @@ export function Login({ onSuccess }) {
                 {isAdminRole ? 'System Role' : 'Selected Franchise'}
               </span>
               <h3 className="font-rajdhani font-black text-xl text-white uppercase tracking-wide leading-tight">
-                {isAdminRole ? 'Host Master Admin' : currentTeam?.name}
+                {isAdminRole ? 'Host Master Admin' : currentTeamName}
               </h3>
               <p className="text-xs text-slate-400 font-inter mt-0.5">
-                {isAdminRole ? 'Full Auction Floor Control' : `Owner: ${currentTeam?.owner}`}
+                {isAdminRole ? 'Full Auction Floor Control' : `Owner: ${currentTeamOwner}`}
               </p>
             </div>
           </div>
@@ -282,7 +369,7 @@ export function Login({ onSuccess }) {
                     setPassword(e.target.value);
                     if (error) setError('');
                   }}
-                  placeholder={isAdminRole ? 'HOST#FF2026-X99' : 'e.g. ALPHA-9082-FF'}
+                  placeholder={isAdminRole ? 'HOST#FF2026-X99' : 'Enter franchise passkey'}
                   autoComplete="current-password"
                   autoFocus
                   className="w-full px-4 py-4 pl-12 pr-12 rounded-xl bg-surface-800/90 border border-surface-600/60

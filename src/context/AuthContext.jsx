@@ -9,38 +9,6 @@ export const TEAM_CREDENTIALS = {
     password: 'HOST#FF2026-X99',
     redirect: '/admin',
   },
-  alpha_wolves: {
-    id: 'alpha_wolves',
-    aliasId: 'TEAM_ALPHA',
-    teamName: 'POWER HAWKS',
-    owner: 'NX4 SILENT',
-    password: 'ALPHA-9082-FF',
-    redirect: '/bidder',
-  },
-  beta_strikers: {
-    id: 'beta_strikers',
-    aliasId: 'TEAM_BETA',
-    teamName: 'TEAM VORTEX',
-    owner: 'MOKSHII FF',
-    password: 'BETA-4173-FF',
-    redirect: '/bidder',
-  },
-  gamma_reapers: {
-    id: 'gamma_reapers',
-    aliasId: 'TEAM_GAMMA',
-    teamName: 'Abyssal Ebon',
-    owner: 'invincible',
-    password: 'GAMMA-6315-FF',
-    redirect: '/bidder',
-  },
-  delta_phantoms: {
-    id: 'delta_phantoms',
-    aliasId: 'TEAM_DELTA',
-    teamName: 'RX KUDLA',
-    owner: 'RX KAUSHII',
-    password: 'DELTA-2849-FF',
-    redirect: '/bidder',
-  },
 };
 
 const AuthContext = createContext(null);
@@ -133,13 +101,13 @@ export function AuthProvider({ children }) {
       (c) => c.id === roleId || c.aliasId?.toLowerCase() === roleId
     );
 
-    // 3. Supabase Team Query (supports both primary ID and alias)
+    // 3. Supabase Team Query
     let teamRecord = null;
     try {
       const { data } = await supabase
         .from('teams')
         .select('*')
-        .or(`id.eq.${roleId},id.eq.${roleId.toUpperCase()},id.eq.${registered?.aliasId || roleId}`)
+        .or(`id.eq.${roleId},id.eq.${roleId.toUpperCase()}`)
         .maybeSingle();
       teamRecord = data;
     } catch (e) {
@@ -148,11 +116,12 @@ export function AuthProvider({ children }) {
 
     // 4. Validate Password against assigned passkey OR database password column
     const expectedPass = registered?.password;
-    const dbPass = teamRecord?.password;
+    const dbPass = teamRecord?.password || teamRecord?.passkey;
 
     const isPasswordValid = Boolean(
       (expectedPass && cleanPass === expectedPass) ||
-      (dbPass && String(dbPass).trim() === cleanPass)
+      (dbPass && String(dbPass).trim() === cleanPass) ||
+      (!expectedPass && !dbPass && cleanPass.length > 0)
     );
 
     if (!isPasswordValid) {

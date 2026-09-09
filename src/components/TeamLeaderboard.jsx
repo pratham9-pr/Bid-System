@@ -6,20 +6,18 @@ import { useTournamentContext } from '../context/TournamentContext';
 export function TeamLeaderboard({ teams = [] }) {
   const { tournament } = useTournamentContext();
   const tournamentName = tournament?.name ?? PLATFORM_CONFIG.name;
-  const activeTeamsList = (teams && teams.length > 0 ? teams : TEAMS_CONFIG).map((t, idx) => {
-    const config = getTeamConfig(t.id) || TEAMS_CONFIG.find((c) => c.id === t.id) || TEAMS_CONFIG[idx] || {};
-    const teamId = t.id || config.id;
-    const displayName = getTeamDisplayName(teamId, t.team_name || t.name || config.name);
-    const ownerName = getTeamOwner(teamId, t.owner_name || t.owner || config.owner);
-    const logoUrl = getTeamLogo(teamId);
-    const defaultStats = config.defaultStats || { wins: 0, losses: 0, diff: '0', pts: 0 };
+  const activeTeamsList = (teams || []).map((t, idx) => {
+    const teamId = t.id || `team_${idx + 1}`;
+    const displayName = getTeamDisplayName(teamId, t.team_name || t.name);
+    const ownerName = getTeamOwner(teamId, t.owner_name || t.owner);
+    const logoUrl = t.logo_url || t.logo || getTeamLogo(teamId);
 
-    const wins = typeof t.wins === 'number' ? t.wins : defaultStats.wins;
-    const losses = typeof t.losses === 'number' ? t.losses : defaultStats.losses;
-    const rawDiff = t.score_diff ?? t.diff ?? defaultStats.diff;
+    const wins = typeof t.wins === 'number' ? t.wins : 0;
+    const losses = typeof t.losses === 'number' ? t.losses : 0;
+    const rawDiff = t.score_diff ?? t.diff ?? 0;
     const diffNum = typeof rawDiff === 'string' ? parseInt(rawDiff.replace('+', ''), 10) || 0 : (Number(rawDiff) || 0);
-    const pts = typeof t.points === 'number' ? t.points : (typeof t.pts === 'number' ? t.pts : defaultStats.pts);
-    const balance = t.fire_coin_balance ?? 40000;
+    const pts = typeof t.points === 'number' ? t.points : (typeof t.pts === 'number' ? t.pts : 0);
+    const balance = t.fire_coin_balance ?? t.purse ?? 40000;
 
     return {
       ...t,

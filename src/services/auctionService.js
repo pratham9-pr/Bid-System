@@ -48,39 +48,7 @@ const safeStr   = (v) => (v != null && String(v).trim() !== '' ? String(v).trim(
 const STATE_ROW = 1;
 
 export function isActiveFranchise(teamId) {
-  if (!teamId) return false;
-  const clean = String(teamId).toLowerCase().trim();
-  return (
-    clean === 'alpha_wolves' ||
-    clean === 'team_alpha' ||
-    clean === 'power_hawks' ||
-    clean === 'power hawks' ||
-    clean === 'alpha' ||
-    clean === '1' ||
-    clean === 'beta_strikers' ||
-    clean === 'team_beta' ||
-    clean === 'team_vortex' ||
-    clean === 'team vortex' ||
-    clean === 'beta' ||
-    clean === 'vortex' ||
-    clean === '2' ||
-    clean === 'gamma_reapers' ||
-    clean === 'team_gamma' ||
-    clean === 'abyssal_ebon' ||
-    clean === 'abyssal ebon' ||
-    clean === 'abyssal' ||
-    clean === 'ebon' ||
-    clean === 'gamma' ||
-    clean === '3' ||
-    clean === 'delta_phantoms' ||
-    clean === 'team_delta' ||
-    clean === 'rx_kudla' ||
-    clean === 'rx kudla' ||
-    clean === 'rx' ||
-    clean === 'kudla' ||
-    clean === 'delta' ||
-    clean === '4'
-  );
+  return Boolean(teamId && String(teamId).trim() !== '');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -942,63 +910,15 @@ export async function removePlayerFromRoster(playerId) {
 export async function resetAllRostersAndCaptains() {
   try {
     // 1. Fetch all players to reset their bids to their own base_price
-    const { data: allP } = await supabase.from('players').select('id, in_game_name, name, base_price');
+    const { data: allP } = await supabase.from('players').select('id, in_game_name, name, base_price, is_captain');
 
     if (allP && allP.length > 0) {
       for (const p of allP) {
-        const pName = (p.in_game_name || p.name || '').toLowerCase().trim();
-        const isNx4 = pName.includes('nx4') || pName.includes('silent') || p.id === 'CAP_NX4_SILENT';
-        const isMokshii = pName.includes('mokshii') || p.id === 'CAP_MOKSHII_FF';
-        const isInvincible = pName.includes('invincible') || p.id === 'CAP_INVINCIBLE';
-        const isRxKaushii = pName.includes('kaushii') || p.id === 'CAP_RX_KAUSHII';
-
-        if (isNx4) {
-          // Lock NX4 SILENT as Permanent Captain for POWER HAWKS
+        if (p.is_captain) {
           await safeUpdatePlayer(p.id, {
-            status:                      'sold',
-            is_captain:                  true,
-            role:                        'IGL',
-            sold_to_team_id:             'alpha_wolves',
-            current_highest_bidder:      'alpha_wolves',
-            current_highest_bidder_name: 'POWER HAWKS',
-            sold_price:                  0,
-            current_bid:                 0,
-          });
-        } else if (isMokshii) {
-          // Lock MOKSHII FF as Permanent Captain for TEAM VORTEX
-          await safeUpdatePlayer(p.id, {
-            status:                      'sold',
-            is_captain:                  true,
-            role:                        'IGL',
-            sold_to_team_id:             'beta_strikers',
-            current_highest_bidder:      'beta_strikers',
-            current_highest_bidder_name: 'TEAM VORTEX',
-            sold_price:                  0,
-            current_bid:                 0,
-          });
-        } else if (isInvincible) {
-          // Lock invincible as Permanent Captain for Abyssal Ebon
-          await safeUpdatePlayer(p.id, {
-            status:                      'sold',
-            is_captain:                  true,
-            role:                        'IGL',
-            sold_to_team_id:             'gamma_reapers',
-            current_highest_bidder:      'gamma_reapers',
-            current_highest_bidder_name: 'Abyssal Ebon',
-            sold_price:                  0,
-            current_bid:                 0,
-          });
-        } else if (isRxKaushii) {
-          // Lock RX KAUSHII as Permanent Captain for RX KUDLA
-          await safeUpdatePlayer(p.id, {
-            status:                      'sold',
-            is_captain:                  true,
-            role:                        'IGL',
-            sold_to_team_id:             'delta_phantoms',
-            current_highest_bidder:      'delta_phantoms',
-            current_highest_bidder_name: 'RX KUDLA',
-            sold_price:                  0,
-            current_bid:                 0,
+            status:     'sold',
+            sold_price: 0,
+            current_bid: 0,
           });
         } else {
           // General Auction Pool Player
@@ -1015,34 +935,11 @@ export async function resetAllRostersAndCaptains() {
       }
     }
 
-    // 2. Reset team balances to default purse (40,000 FC) and sync names
+    // 2. Reset team balances to default purse and clear timestamps
     await supabase.from('teams').update({
-      team_name:         'POWER HAWKS',
-      owner_name:        'NX4 SILENT',
       fire_coin_balance: DEFAULT_TEAM_PURSE,
       last_bid_time:     null,
-    }).or('id.eq.alpha_wolves,id.eq.TEAM_ALPHA');
-
-    await supabase.from('teams').update({
-      team_name:         'TEAM VORTEX',
-      owner_name:        'MOKSHII FF',
-      fire_coin_balance: DEFAULT_TEAM_PURSE,
-      last_bid_time:     null,
-    }).or('id.eq.beta_strikers,id.eq.TEAM_BETA');
-
-    await supabase.from('teams').update({
-      team_name:         'ABYSSAL EBON',
-      owner_name:        'invincible',
-      fire_coin_balance: DEFAULT_TEAM_PURSE,
-      last_bid_time:     null,
-    }).or('id.eq.gamma_reapers,id.eq.TEAM_GAMMA');
-
-    await supabase.from('teams').update({
-      team_name:         'RX KUDLA',
-      owner_name:        'RX KAUSHII',
-      fire_coin_balance: DEFAULT_TEAM_PURSE,
-      last_bid_time:     null,
-    }).or('id.eq.delta_phantoms,id.eq.TEAM_DELTA');
+    }).neq('id', '');
 
     // 3. Reset auction state
     await safeUpdateAuctionState({
@@ -1124,25 +1021,14 @@ export async function hardResetDatabase() {
       }
     }
 
-    // 3. Reset all 4 franchise team records to 40,000 FC and clear timestamps
-    const teamConfigs = [
-      { id: 'alpha_wolves',   name: 'POWER HAWKS',   owner: 'NX4 SILENT',   alt: 'TEAM_ALPHA' },
-      { id: 'beta_strikers',  name: 'TEAM VORTEX',   owner: 'MOKSHII FF',   alt: 'TEAM_BETA' },
-      { id: 'gamma_reapers',  name: 'ABYSSAL EBON',  owner: 'invincible',   alt: 'TEAM_GAMMA' },
-      { id: 'delta_phantoms', name: 'RX KUDLA',      owner: 'RX KAUSHII',   alt: 'TEAM_DELTA' },
-    ];
-
-    for (const t of teamConfigs) {
-      await supabase
-        .from('teams')
-        .update({
-          team_name:         t.name,
-          owner_name:        t.owner,
-          fire_coin_balance: 40000,
-          last_bid_time:     null,
-        })
-        .or(`id.eq.${t.id},id.eq.${t.alt}`);
-    }
+    // 3. Reset all team records to default purse and clear timestamps
+    await supabase
+      .from('teams')
+      .update({
+        fire_coin_balance: 40000,
+        last_bid_time:     null,
+      })
+      .neq('id', '___ZERO_MATCH_SAFE_KEY___');
 
     // 4. Clear local storage caches for clean state
     try {
