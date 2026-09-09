@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Login } from '../components/Login';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -33,10 +34,10 @@ export default function LoginPage() {
               <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full overflow-hidden border-2 border-amber-500/60 shadow-[0_0_40px_rgba(245,158,11,0.4)] relative z-10 bg-black/90 p-1">
                 <img
                   src="/image_440ba2.jpg"
-                  alt="Demons Reign"
+                  alt={PLATFORM_CONFIG.name}
                   className="w-full h-full object-cover object-center rounded-full transition-transform duration-700 group-hover:scale-105"
                   onError={(e) => {
-                    e.currentTarget.src = '/demons_reign_logo.jpg';
+                    e.currentTarget.src = PLATFORM_CONFIG.logoFallback;
                   }}
                 />
               </div>
@@ -44,10 +45,10 @@ export default function LoginPage() {
 
             <div className="space-y-1.5">
               <h1 className="font-rajdhani font-black text-4xl sm:text-5xl lg:text-6xl text-white tracking-tight leading-none drop-shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
-                DEMONS <span className="text-gradient-fire">REIGN</span>
+                {PLATFORM_CONFIG.name}
               </h1>
               <p className="font-rajdhani font-extrabold text-sm sm:text-base lg:text-lg text-slate-300 tracking-[0.3em] uppercase">
-                AUCTION SERIES 2026
+                {PLATFORM_CONFIG.tagline}
               </p>
               <p className="text-xs sm:text-sm text-slate-400 font-inter max-w-md pt-1 leading-relaxed">
                 Real-time synchronized live bidding floor for Free Fire franchise owners, team management, and broadcast production.
@@ -101,7 +102,7 @@ export default function LoginPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-rajdhani font-black text-sm text-white uppercase tracking-wider group-hover:text-amber-300 transition-colors">
-                      Demons Reign Points Table
+                      Official Standings
                     </span>
                     <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[9px] font-rajdhani font-black uppercase">
                       1080p OBS
@@ -136,7 +137,7 @@ export default function LoginPage() {
       {/* ── Minimalist Footer ─────────────────────────────────────────── */}
       <footer className="w-full py-4 text-center border-t border-surface-600/30 relative z-10 bg-surface-950/60 backdrop-blur-sm">
         <p className="text-[11px] font-inter text-slate-500 tracking-wider">
-          DEMONS REIGN AUCTION LEAGUE • REAL-TIME MULTI-TENANT ENGINE • 2026
+          {PLATFORM_CONFIG.footerTag} AUCTION LEAGUE • REAL-TIME MULTI-TENANT ENGINE • {PLATFORM_CONFIG.year}
         </p>
       </footer>
     </div>

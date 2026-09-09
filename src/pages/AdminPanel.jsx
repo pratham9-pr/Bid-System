@@ -11,6 +11,7 @@ import { AddPlayerForm } from '../components/AddPlayerForm';
 import { TeamRosters } from '../components/TeamRosters';
 import { getTeamDisplayName, TEAMS_CONFIG } from '../config/teamsConfig';
 import { seedDatabase, hardResetDatabase, revealPlayer, hidePlayer, startBidding, closeBidding, manualSellToTeam, setBroadcastView } from '../services/auctionService';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
 
 export default function AdminPanel() {
   const navigate  = useNavigate();
@@ -82,9 +83,9 @@ export default function AdminPanel() {
                       sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full overflow-hidden border border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.3)] bg-black flex-shrink-0">
-            <img src="/demons_reign_logo.jpg" alt="Demons Reign" className="w-full h-full object-cover" />
+            <img src="/logo.png" alt={PLATFORM_CONFIG.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
           </div>
-          <span className="font-rajdhani font-black text-white tracking-wider uppercase">Demons Reign Host</span>
+          <span className="font-rajdhani font-black text-white tracking-wider uppercase">{PLATFORM_CONFIG.name} Host</span>
           {activePlayer?.status === 'active' && (
             <span className="badge-active animate-pulse">
               Live: {activePlayer.in_game_name}

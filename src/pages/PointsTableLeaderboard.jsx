@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAllTeams } from '../hooks/useAllTeams';
 import { TEAMS_CONFIG, getTeamDisplayName, getTeamOwner, getTeamLogo } from '../config/teamsConfig';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
 
-// ─── DEMONS REIGN ESPORTS POINTS TABLE & LEADERBOARD COMPONENT ────────────────
+// ─── TOURNAMENT ESPORTS POINTS TABLE & LEADERBOARD COMPONENT ────────────────
 export default function PointsTableLeaderboard({ transparentBg: propTransparentBg } = {}) {
   const { teams } = useAllTeams();
   const [internalTransparentBg, setInternalTransparentBg] = useState(false);
@@ -116,9 +117,10 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
             >
               <div className="w-full h-full bg-black flex items-center justify-center p-1">
                 <img
-                  src="/demons_reign_logo.jpg"
-                  alt="Demons Reign"
+                  src="/logo.png"
+                  alt={PLATFORM_CONFIG.name}
                   className="w-full h-full object-cover"
+                  onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
                 />
               </div>
             </div>
@@ -126,7 +128,7 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-rajdhani font-black italic text-2xl sm:text-3xl text-white tracking-[0.12em] uppercase leading-none">
-                  DEMONS <span className="text-gradient-gold">REIGN</span>
+                  {PLATFORM_CONFIG.name}
                 </h1>
                 <span
                   style={{
@@ -288,7 +290,7 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
                           src={team.logoUrl}
                           alt={team.displayName}
                           className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                          onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
                         />
                       </div>
                     </div>
@@ -355,12 +357,12 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
       </main>
 
       {/* ===================================================================== */}
-      {/* 3. DEMONS REIGN ESPORTS TELEMETRY FOOTER                              */}
+      {/* 3. TOURNAMENT ESPORTS TELEMETRY FOOTER                                */}
       {/* ===================================================================== */}
       <footer className="w-full relative z-20 flex-shrink-0 mt-2">
         <div className="w-full py-2 px-6 bg-black/70 border-t border-white/10 flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-widest">
           <div className="flex items-center gap-3">
-            <span className="text-amber-400 font-black">DEMONS REIGN 2026</span>
+            <span className="text-amber-400 font-black">{PLATFORM_CONFIG.footerTag} {PLATFORM_CONFIG.year}</span>
             <span>•</span>
             <span>OFFICIAL AUCTION SERIES</span>
           </div>

@@ -10,6 +10,7 @@ import { PlayersQueue }       from '../components/PlayersQueue';
 import { CompetitorSidebar }  from '../components/CompetitorSidebar';
 import { getTeamDisplayName } from '../config/teamsConfig';
 import { Notification }       from '../components/Notification';
+import { PLATFORM_CONFIG }    from '../config/platformConfig';
 
 export default function AuctionRoom() {
   const { team, currentUser, loading: authLoading, signOut } = useAuth();
@@ -55,10 +56,10 @@ export default function AuctionRoom() {
                       sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full overflow-hidden border border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.3)] bg-black flex-shrink-0">
-            <img src="/demons_reign_logo.jpg" alt="Demons Reign" className="w-full h-full object-cover" />
+            <img src="/logo.png" alt={PLATFORM_CONFIG.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
           </div>
           <span className="font-rajdhani font-black text-white tracking-wider hidden sm:block uppercase">
-            Demons Reign Auction
+            {PLATFORM_CONFIG.name} Auction
           </span>
           {activePlayer && isRevealed && !biddingOpen && !auctionPaused && (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px]

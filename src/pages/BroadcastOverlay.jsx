@@ -7,6 +7,7 @@ import { PlayerRevealCard } from '../components/PlayerRevealCard';
 import { getTeamDisplayName, getTeamOwner, getTeamLogo, TEAMS_CONFIG } from '../config/teamsConfig';
 import { getTeamFullRoster } from '../config/franchiseCaptains';
 import { MAX_BID_LIMIT } from '../services/auctionService';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
 
 // ─── SOLD OUT Stamp Component ────────────────────────────────────────────────
 function SoldOutStamp({ winnerName, winningBid }) {
@@ -119,7 +120,7 @@ function FranchiseSidebarCard({ teamId, teams, players }) {
                 src={logoUrl}
                 alt={displayName}
                 className="w-full h-full object-cover rounded-full"
-                onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
               />
             </div>
             <div className="min-w-0">
@@ -270,12 +271,12 @@ export default function BroadcastOverlay() {
         {/* Left: Branding */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border-2 border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] bg-black flex-shrink-0 p-0.5">
-            <img src="/image_440ba2.jpg" alt="Demons Reign" className="w-full h-full object-cover rounded-full" onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }} />
+            <img src="/image_440ba2.jpg" alt={PLATFORM_CONFIG.name} className="w-full h-full object-cover rounded-full" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-rajdhani font-black text-sm sm:text-base text-white tracking-wider leading-none">
-                DEMONS <span className="text-gradient-fire">REIGN</span>
+                {PLATFORM_CONFIG.name}
               </h1>
               <span className="text-[9px] font-rajdhani font-bold px-2 py-0.5 rounded-full bg-fire-500/20 text-fire-300 border border-fire-500/30 uppercase hidden sm:inline">
                 STAGE LIVE
@@ -423,7 +424,7 @@ export default function BroadcastOverlay() {
                           src={getTeamLogo(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id)}
                           alt="Leading Team"
                           className="w-full h-full object-cover rounded-full"
-                          onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                          onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
                         />
                       </div>
                       <div className="text-left min-w-0">
@@ -464,7 +465,7 @@ export default function BroadcastOverlay() {
       {/* 3. MINIMALIST FOOTER TICKER                                           */}
       {/* ===================================================================== */}
       <footer className="w-full py-1 px-6 text-center border-t border-white/5 bg-black/60 backdrop-blur-sm text-[9px] font-inter text-slate-500 tracking-wider flex-shrink-0 flex items-center justify-between">
-        <span>DEMONS REIGN AUCTION SERIES 2026</span>
+        <span>{PLATFORM_CONFIG.footerTag} AUCTION SERIES {PLATFORM_CONFIG.year}</span>
         <span className="text-amber-400 font-rajdhani font-black uppercase tracking-widest hidden sm:inline">
           REAL-TIME SYNCHRONIZED BROADCAST
         </span>

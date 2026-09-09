@@ -392,7 +392,7 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
                       src={item.logo}
                       alt={item.name}
                       className="w-full h-full object-cover"
-                      onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                      onError={(e) => { e.currentTarget.src = '/logo.png'; }}
                     />
                   </div>
                   <div className="min-w-0">

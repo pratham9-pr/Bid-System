@@ -1164,7 +1164,7 @@ export async function hardResetDatabase() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  STANDINGS & MATCH MATRIX CONTROLS (Demons Reign Host Admin Controls)
+//  STANDINGS & MATCH MATRIX CONTROLS (Tournament Host Admin Controls)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function updateTeamStandings(teamId, stats = {}) {
   try {

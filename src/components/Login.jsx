@@ -150,7 +150,7 @@ export function Login({ onSuccess }) {
                         src={t.logo}
                         alt={t.name}
                         className="w-full h-full object-cover rounded-full"
-                        onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                        onError={(e) => { e.currentTarget.src = '/logo.png'; }}
                       />
                     </div>
                     <span className="text-[10px] font-rajdhani font-black px-2 py-0.5 rounded-md bg-black/50 border border-white/10 text-slate-300 tracking-wider">
@@ -243,7 +243,7 @@ export function Login({ onSuccess }) {
                   src={currentTeam?.logo}
                   alt={currentTeam?.name}
                   className="w-full h-full object-cover rounded-full"
-                  onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                  onError={(e) => { e.currentTarget.src = '/logo.png'; }}
                 />
               )}
             </div>

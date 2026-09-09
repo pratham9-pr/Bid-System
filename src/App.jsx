@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { PLATFORM_CONFIG } from './config/platformConfig';
 import LoginPage                 from './pages/LoginPage';
 import AuctionRoom               from './pages/AuctionRoom';
 import AdminPanel                from './pages/AdminPanel';
@@ -20,7 +21,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('Demons Reign UI Crash caught by ErrorBoundary:', error, errorInfo);
+    console.error(`${PLATFORM_CONFIG.name} UI Crash caught by ErrorBoundary:`, error, errorInfo);
   }
 
   render() {
@@ -32,7 +33,7 @@ class ErrorBoundary extends React.Component {
               ⚠️
             </div>
             <h2 className="font-rajdhani font-black text-xl text-white uppercase tracking-wider mb-2">
-              Demons Reign · Interface Recovery
+              {PLATFORM_CONFIG.name} · Interface Recovery
             </h2>
             <p className="text-xs text-slate-300 font-inter mb-4 leading-relaxed">
               A temporary display error occurred. Click below to reload the auction floor or return to team login.
@@ -143,7 +144,7 @@ export default function App() {
             <Route path="/broadcast" element={<BroadcastOverlay />} />
             <Route path="/overlay" element={<Navigate to="/broadcast" replace />} />
 
-            {/* Standalone Demons Reign Esports Points Table / Leaderboard (1920x1080 OBS Ready) */}
+            {/* Standalone Tournament Points Table / Leaderboard (1920x1080 OBS Ready) */}
             <Route path="/leaderboard" element={<PointsTableLeaderboard />} />
             <Route path="/pointstable" element={<PointsTableLeaderboard />} />
             <Route path="/points" element={<PointsTableLeaderboard />} />

@@ -417,7 +417,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
                   src={getTeamLogo(activePlayer.current_highest_bidder)}
                   alt="Team Logo"
                   className="w-full h-full object-cover rounded-full"
-                  onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                  onError={(e) => { e.currentTarget.src = '/logo.png'; }}
                 />
               </div>
               <div className="min-w-0">

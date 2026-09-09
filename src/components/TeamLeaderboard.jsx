@@ -1,5 +1,6 @@
 import React from 'react';
 import { TEAMS_CONFIG, getTeamDisplayName, getTeamOwner, getTeamLogo, getTeamConfig } from '../config/teamsConfig';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
 
 export function TeamLeaderboard({ teams = [] }) {
   const activeTeamsList = (teams && teams.length > 0 ? teams : TEAMS_CONFIG).map((t, idx) => {
@@ -62,7 +63,7 @@ export function TeamLeaderboard({ teams = [] }) {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="font-black italic text-xl text-white tracking-widest uppercase">
-              DEMONS REIGN LEADERBOARD
+              {PLATFORM_CONFIG.name} LEADERBOARD
             </h2>
             <span
               style={{
@@ -151,7 +152,7 @@ export function TeamLeaderboard({ teams = [] }) {
                     src={team.logoUrl}
                     alt={team.displayName}
                     className="w-full h-full object-cover"
-                    onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                    onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
                   />
                 </div>
                 <div className="min-w-0">

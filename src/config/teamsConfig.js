@@ -1,6 +1,7 @@
 // ─── TEAM CONFIGURATION — SINGLE SOURCE OF TRUTH ─────────────────────────────
 // Team IDs are preserved for database FK integrity.
 // Display names, owners, and aliases are updated here and propagate across the entire application.
+import { PLATFORM_CONFIG } from './platformConfig';
 
 export const TEAMS_CONFIG = [
   {
@@ -118,5 +119,5 @@ export function getTeamConfig(teamId) {
 /** Returns the team logo path */
 export function getTeamLogo(teamId) {
   const config = getTeamConfig(teamId);
-  return config?.logo || '/demons_reign_logo.jpg';
+  return config?.logo || PLATFORM_CONFIG.logoFallback;
 }

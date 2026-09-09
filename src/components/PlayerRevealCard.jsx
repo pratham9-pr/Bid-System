@@ -1,22 +1,23 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
 
-// ─── Demons Reign Emblem for Card Front ──────────────────────────────────────
+// ─── Platform Emblem for Card Front ──────────────────────────────────────────
 const CardFrontLogo = () => (
   <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 select-none">
     <div className="relative">
       <div className="absolute -inset-3 rounded-full bg-red-600/30 blur-2xl animate-pulse" />
       <div className="w-20 h-20 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden border-2 border-red-500/60 shadow-[0_0_30px_rgba(239,68,68,0.4)] relative z-10 bg-black p-0.5">
         <img
-          src="/demons_reign_logo.jpg"
-          alt="Demons Reign"
+          src={PLATFORM_CONFIG.logoFallback}
+          alt={PLATFORM_CONFIG.name}
           className="w-full h-full object-cover rounded-full"
         />
       </div>
     </div>
     <div className="text-center space-y-0.5 sm:space-y-1">
       <h3 className="font-rajdhani font-black text-xl sm:text-2xl tracking-[0.25em] text-white uppercase leading-tight">
-        DEMONS REIGN
+        {PLATFORM_CONFIG.name}
       </h3>
       <p className="font-rajdhani font-black text-[10px] sm:text-xs tracking-[0.35em] text-fire-400 uppercase">
         OFFICIAL AUCTION CARD
@@ -70,7 +71,7 @@ export function PlayerRevealCard({ player, activePlayer, isRevealed, auctionStat
         className="relative w-full h-full max-h-full rounded-2xl cursor-default shadow-[0_20px_50px_-10px_rgba(0,0,0,0.85)] flex flex-col"
       >
         {/* ================================================================= */}
-        {/* FRONT FACE: Demons Reign Emblem & Standby Suspense                */}
+        {/* FRONT FACE: Platform Emblem & Standby Suspense                    */}
         {/* ================================================================= */}
         <div
           style={{
