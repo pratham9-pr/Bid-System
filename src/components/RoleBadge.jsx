@@ -1,7 +1,8 @@
 import React from 'react';
 
 // ─── Role metadata ────────────────────────────────────────────────────────────
-export const FREE_FIRE_ROLES = ['Rusher', 'Sniper', 'IGL', 'Supporter'];
+export const TOURNAMENT_ROLES = ['Rusher', 'Sniper', 'IGL', 'Supporter'];
+export const FREE_FIRE_ROLES = TOURNAMENT_ROLES;
 
 const ROLE_CONFIG = {
   Rusher:    { bg: 'bg-red-500/15',     text: 'text-red-400',     border: 'border-red-500/30',     glyph: '⚡' },
@@ -17,8 +18,8 @@ const SIZE_CLASSES = {
 };
 
 /**
- * RoleBadge — displays a colour-coded Free Fire role tag.
- * @param {string} role   — One of FREE_FIRE_ROLES
+ * RoleBadge — displays a colour-coded tournament role tag.
+ * @param {string} role   — One of TOURNAMENT_ROLES
  * @param {'xs'|'sm'|'md'} size  — Badge size variant (default: 'sm')
  */
 export function RoleBadge({ role, size = 'sm' }) {

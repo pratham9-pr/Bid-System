@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { addPlayer } from '../services/auctionService';
-import { RoleBadge, FREE_FIRE_ROLES } from './RoleBadge';
+import { RoleBadge, TOURNAMENT_ROLES } from './RoleBadge';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const UploadIcon = () => (
@@ -252,7 +252,7 @@ export function AddPlayerForm({ onSuccess }) {
                       ${!role ? 'text-muted' : 'text-white'}`}
                   >
                     <option value="" disabled>Select a role…</option>
-                    {FREE_FIRE_ROLES.map((r) => (
+                    {TOURNAMENT_ROLES.map((r) => (
                       <option key={r} value={r} className="bg-surface-800 text-white">{r}</option>
                     ))}
                   </select>

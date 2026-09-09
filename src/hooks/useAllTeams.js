@@ -64,7 +64,7 @@ export function useAllTeams() {
           id: teamId,
           team_name: found.team_name || found.name || config.name,
           owner_name: found.owner_name || found.owner || config.owner,
-          owner_email: found.owner_email || `${teamId}@freefire.auction`,
+          owner_email: found.owner_email || `${teamId}@tournament.auction`,
           matches_played: typeof found.matches_played === 'number'
             ? found.matches_played
             : (winsNum + lossesNum),

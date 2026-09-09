@@ -63,7 +63,7 @@ export default function LoginPage() {
                 {tournamentTagline}
               </p>
               <p className="text-xs sm:text-sm text-slate-400 font-inter max-w-md pt-1 leading-relaxed">
-                Real-time synchronized live bidding floor for Free Fire franchise owners, team management, and broadcast production.
+                Real-time synchronized live bidding floor for sports and esports franchise owners, team management, and broadcast production.
               </p>
             </div>
           </div>
