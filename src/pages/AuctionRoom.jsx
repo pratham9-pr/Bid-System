@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAuctionRoom } from '../hooks/useAuctionRoom';
 import { useAllPlayers } from '../hooks/useAllPlayers';
@@ -11,10 +11,17 @@ import { CompetitorSidebar }  from '../components/CompetitorSidebar';
 import { getTeamDisplayName } from '../config/teamsConfig';
 import { Notification }       from '../components/Notification';
 import { PLATFORM_CONFIG }    from '../config/platformConfig';
+import { useTournament }      from '../hooks/useTournament';
+import { useTournamentContext } from '../context/TournamentContext';
 
 export default function AuctionRoom() {
+  const { id } = useParams();
   const { team, currentUser, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
+  const { tournament: routeTournament } = useTournament(id);
+  const { tournament: contextTournament } = useTournamentContext();
+  const tournament = (id ? routeTournament : null) || contextTournament || routeTournament || { name: PLATFORM_CONFIG.name };
+  const tournamentName = tournament?.name ?? PLATFORM_CONFIG.name;
 
   const effectiveTeam = team || (currentUser?.role === 'bidder' ? currentUser : null);
 
@@ -24,6 +31,12 @@ export default function AuctionRoom() {
 
   const handleNotify  = useCallback((n) => setNotification(n), []);
   const handleDismiss = useCallback(() => setNotification(null), []);
+
+  // Keep browser tab title in sync with active tournament
+  useEffect(() => {
+    document.title = `${tournamentName} — Auction Floor`;
+    return () => { document.title = PLATFORM_CONFIG.name; };
+  }, [tournamentName]);
 
   const handleLogout = async () => {
     await signOut();
@@ -56,10 +69,10 @@ export default function AuctionRoom() {
                       sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full overflow-hidden border border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.3)] bg-black flex-shrink-0">
-            <img src="/logo.png" alt={PLATFORM_CONFIG.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
+            <img src="/logo.png" alt={tournamentName} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
           </div>
-          <span className="font-rajdhani font-black text-white tracking-wider hidden sm:block uppercase">
-            {PLATFORM_CONFIG.name} Auction
+          <span className="font-rajdhani font-black italic text-white tracking-wider hidden sm:block uppercase">
+            {tournamentName} Auction
           </span>
           {activePlayer && isRevealed && !biddingOpen && !auctionPaused && (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px]

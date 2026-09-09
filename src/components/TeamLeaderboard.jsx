@@ -1,8 +1,11 @@
 import React from 'react';
 import { TEAMS_CONFIG, getTeamDisplayName, getTeamOwner, getTeamLogo, getTeamConfig } from '../config/teamsConfig';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
+import { useTournamentContext } from '../context/TournamentContext';
 
 export function TeamLeaderboard({ teams = [] }) {
+  const { tournament } = useTournamentContext();
+  const tournamentName = tournament?.name ?? PLATFORM_CONFIG.name;
   const activeTeamsList = (teams && teams.length > 0 ? teams : TEAMS_CONFIG).map((t, idx) => {
     const config = getTeamConfig(t.id) || TEAMS_CONFIG.find((c) => c.id === t.id) || TEAMS_CONFIG[idx] || {};
     const teamId = t.id || config.id;
@@ -63,7 +66,7 @@ export function TeamLeaderboard({ teams = [] }) {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="font-black italic text-xl text-white tracking-widest uppercase">
-              {PLATFORM_CONFIG.name} LEADERBOARD
+              {tournamentName} LEADERBOARD
             </h2>
             <span
               style={{

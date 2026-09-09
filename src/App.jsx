@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { PLATFORM_CONFIG } from './config/platformConfig';
+import { TournamentProvider } from './context/TournamentContext';
 import LoginPage                 from './pages/LoginPage';
 import AuctionRoom               from './pages/AuctionRoom';
 import AdminPanel                from './pages/AdminPanel';
@@ -103,56 +104,72 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            {/* Unified Passkey Login at Root (/) */}
-            <Route path="/" element={<LoginPage />} />
+          <TournamentProvider>
+            <Routes>
+              {/* Unified Passkey Login at Root (/) */}
+              <Route path="/" element={<LoginPage />} />
 
-            {/* Protected Host/Admin Controls (Role: 'admin') */}
-            <Route
-              path="/admin"
-              element={
-                <AdminRoute>
-                  <AdminPanel />
-                </AdminRoute>
-              }
-            />
+              {/* Protected Host/Admin Controls (Role: 'admin') */}
+              <Route
+                path="/admin"
+                element={
+                  <AdminRoute>
+                    <AdminPanel />
+                  </AdminRoute>
+                }
+              />
 
-            {/* Per-Tournament Admin Dashboard (Role: 'admin') */}
-            <Route
-              path="/admin/tournament/:id"
-              element={
-                <AdminRoute>
-                  <TournamentAdminDashboard />
-                </AdminRoute>
-              }
-            />
+              {/* Per-Tournament Admin Dashboard (Role: 'admin') */}
+              <Route
+                path="/admin/tournament/:id"
+                element={
+                  <AdminRoute>
+                    <TournamentAdminDashboard />
+                  </AdminRoute>
+                }
+              />
 
-            {/* Protected Team Bidder Auction Room (Role: 'bidder') */}
-            <Route
-              path="/bidder"
-              element={
-                <BidderRoute>
-                  <AuctionRoom />
-                </BidderRoute>
-              }
-            />
+              {/* Protected Team Bidder Auction Room (Role: 'bidder') */}
+              <Route
+                path="/bidder"
+                element={
+                  <BidderRoute>
+                    <AuctionRoom />
+                  </BidderRoute>
+                }
+              />
+              <Route
+                path="/bidder/:id"
+                element={
+                  <BidderRoute>
+                    <AuctionRoom />
+                  </BidderRoute>
+                }
+              />
 
-            {/* Backward compatibility alias /auction -> /bidder */}
-            <Route path="/auction" element={<Navigate to="/bidder" replace />} />
+              {/* Backward compatibility alias /auction -> /bidder */}
+              <Route path="/auction" element={<Navigate to="/bidder" replace />} />
 
-            {/* Public Read-Only Broadcast Overlay (OBS ready) */}
-            <Route path="/broadcast" element={<BroadcastOverlay />} />
-            <Route path="/overlay" element={<Navigate to="/broadcast" replace />} />
+              {/* Public Read-Only Broadcast Overlay (OBS ready) */}
+              <Route path="/broadcast" element={<BroadcastOverlay />} />
+              <Route path="/broadcast/:id" element={<BroadcastOverlay />} />
+              <Route path="/overlay" element={<Navigate to="/broadcast" replace />} />
+              <Route path="/overlay/:id" element={<BroadcastOverlay />} />
 
-            {/* Standalone Tournament Points Table / Leaderboard (1920x1080 OBS Ready) */}
-            <Route path="/leaderboard" element={<PointsTableLeaderboard />} />
-            <Route path="/pointstable" element={<PointsTableLeaderboard />} />
-            <Route path="/points" element={<PointsTableLeaderboard />} />
-            <Route path="/standings" element={<PointsTableLeaderboard />} />
+              {/* Standalone Tournament Points Table / Leaderboard (1920x1080 OBS Ready) */}
+              <Route path="/leaderboard" element={<PointsTableLeaderboard />} />
+              <Route path="/leaderboard/:id" element={<PointsTableLeaderboard />} />
+              <Route path="/pointstable" element={<PointsTableLeaderboard />} />
+              <Route path="/pointstable/:id" element={<PointsTableLeaderboard />} />
+              <Route path="/points" element={<PointsTableLeaderboard />} />
+              <Route path="/points/:id" element={<PointsTableLeaderboard />} />
+              <Route path="/standings" element={<PointsTableLeaderboard />} />
+              <Route path="/standings/:id" element={<PointsTableLeaderboard />} />
 
-            {/* Catch-all fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              {/* Catch-all fallback */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </TournamentProvider>
         </BrowserRouter>
       </AuthProvider>
     </ErrorBoundary>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAllPlayers } from '../hooks/useAllPlayers';
@@ -12,10 +12,19 @@ import { TeamRosters } from '../components/TeamRosters';
 import { getTeamDisplayName, TEAMS_CONFIG } from '../config/teamsConfig';
 import { seedDatabase, hardResetDatabase, revealPlayer, hidePlayer, startBidding, closeBidding, manualSellToTeam, setBroadcastView } from '../services/auctionService';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
+import { useTournamentContext } from '../context/TournamentContext';
 
 export default function AdminPanel() {
   const navigate  = useNavigate();
   const { firebaseUser, signOut, isAdmin } = useAuth();
+  const { tournament } = useTournamentContext();
+  const tournamentName = tournament?.name ?? PLATFORM_CONFIG.name;
+
+  // Keep browser tab title in sync with active tournament
+  useEffect(() => {
+    document.title = `${tournamentName} — Host Panel`;
+    return () => { document.title = PLATFORM_CONFIG.name; };
+  }, [tournamentName]);
 
   // Admin tabs — role-gated
   const TABS = isAdmin
@@ -83,9 +92,9 @@ export default function AdminPanel() {
                       sticky top-0 z-30">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full overflow-hidden border border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.3)] bg-black flex-shrink-0">
-            <img src="/logo.png" alt={PLATFORM_CONFIG.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
+            <img src="/logo.png" alt={tournamentName} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
           </div>
-          <span className="font-rajdhani font-black text-white tracking-wider uppercase">{PLATFORM_CONFIG.name} Host</span>
+          <span className="font-rajdhani font-black italic text-white tracking-wider uppercase">{tournamentName} Host</span>
           {activePlayer?.status === 'active' && (
             <span className="badge-active animate-pulse">
               Live: {activePlayer.in_game_name}

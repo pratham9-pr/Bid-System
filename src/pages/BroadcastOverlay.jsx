@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useParams } from 'react-router-dom';
 import { useAuctionRoom } from '../hooks/useAuctionRoom';
 import { useAllTeams } from '../hooks/useAllTeams';
 import { useAllPlayers } from '../hooks/useAllPlayers';
@@ -8,6 +9,8 @@ import { getTeamDisplayName, getTeamOwner, getTeamLogo, TEAMS_CONFIG } from '../
 import { getTeamFullRoster } from '../config/franchiseCaptains';
 import { MAX_BID_LIMIT } from '../services/auctionService';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
+import { useTournament } from '../hooks/useTournament';
+import { TournamentContext, useTournamentContext } from '../context/TournamentContext';
 
 // ─── SOLD OUT Stamp Component ────────────────────────────────────────────────
 function SoldOutStamp({ winnerName, winningBid }) {
@@ -232,11 +235,25 @@ import PointsTableLeaderboard from './PointsTableLeaderboard';
 //  BroadcastOverlay Component (Three-Column Fullscreen 25% | 50% | 25% + Standings)
 // ─────────────────────────────────────────────────────────────────────────────
 export default function BroadcastOverlay() {
+  const { id } = useParams();
   const { activePlayer, auctionPaused, isRevealed, auctionState } = useAuctionRoom(null);
   const { teams } = useAllTeams();
   const { players } = useAllPlayers();
+
+  // Fetch tournament using active :id from URL, or fallback to general active tournament
+  const { tournament: routeTournament, loading: tournamentLoading } = useTournament(id);
+  const { tournament: contextTournament } = useTournamentContext();
+  const tournament = routeTournament || contextTournament || { name: PLATFORM_CONFIG.name };
+  const tournamentName = tournament?.name ?? PLATFORM_CONFIG.name;
+
   const [transparentBg, setTransparentBg] = useState(false);
   const [activeView, setActiveView] = useState('auction'); // 'auction' | 'standings'
+
+  // Update document title
+  React.useEffect(() => {
+    document.title = `${tournamentName} — Live Broadcast`;
+    return () => { document.title = PLATFORM_CONFIG.name; };
+  }, [tournamentName]);
 
   // Synchronize remote broadcast view if broadcast by host
   React.useEffect(() => {
@@ -252,10 +269,11 @@ export default function BroadcastOverlay() {
   const isSold = activePlayer?.status === 'sold';
 
   return (
-    <div
-      className={`h-screen w-screen flex flex-col justify-between relative overflow-hidden transition-colors duration-300 select-none
-        ${transparentBg ? 'bg-transparent' : 'bg-[#05060a] bg-radial-gradient'}`}
-    >
+    <TournamentContext.Provider value={{ tournament, loading: tournamentLoading }}>
+      <div
+        className={`h-screen w-screen flex flex-col justify-between relative overflow-hidden transition-colors duration-300 select-none
+          ${transparentBg ? 'bg-transparent' : 'bg-[#05060a] bg-radial-gradient'}`}
+      >
       {/* ── Ambient Background Lighting ───────────────────────────────── */}
       {!transparentBg && (
         <>
@@ -271,19 +289,19 @@ export default function BroadcastOverlay() {
         {/* Left: Branding */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border-2 border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] bg-black flex-shrink-0 p-0.5">
-            <img src="/image_440ba2.jpg" alt={PLATFORM_CONFIG.name} className="w-full h-full object-cover rounded-full" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
+            <img src="/image_440ba2.jpg" alt={tournamentName} className="w-full h-full object-cover rounded-full" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="font-rajdhani font-black text-sm sm:text-base text-white tracking-wider leading-none">
-                {PLATFORM_CONFIG.name}
+              <h1 className="font-rajdhani font-black italic text-sm sm:text-base text-white tracking-wider leading-none uppercase">
+                {tournamentName}
               </h1>
               <span className="text-[9px] font-rajdhani font-bold px-2 py-0.5 rounded-full bg-fire-500/20 text-fire-300 border border-fire-500/30 uppercase hidden sm:inline">
                 STAGE LIVE
               </span>
             </div>
             <p className="font-rajdhani font-bold text-[9px] tracking-[0.25em] text-slate-400 uppercase mt-0.5">
-              AUCTION SERIES 2026 • OFFICIAL BROADCAST
+              {tournament?.sport_type ? `${tournament.sport_type.toUpperCase()} ` : ''}AUCTION SERIES {PLATFORM_CONFIG.year} • OFFICIAL BROADCAST
             </p>
           </div>
         </div>
@@ -465,12 +483,13 @@ export default function BroadcastOverlay() {
       {/* 3. MINIMALIST FOOTER TICKER                                           */}
       {/* ===================================================================== */}
       <footer className="w-full py-1 px-6 text-center border-t border-white/5 bg-black/60 backdrop-blur-sm text-[9px] font-inter text-slate-500 tracking-wider flex-shrink-0 flex items-center justify-between">
-        <span>{PLATFORM_CONFIG.footerTag} AUCTION SERIES {PLATFORM_CONFIG.year}</span>
+        <span>{tournamentName.toUpperCase()} AUCTION SERIES {PLATFORM_CONFIG.year}</span>
         <span className="text-amber-400 font-rajdhani font-black uppercase tracking-widest hidden sm:inline">
           REAL-TIME SYNCHRONIZED BROADCAST
         </span>
         <span>OBS RESOLUTION: 1920×1080</span>
       </footer>
     </div>
+    </TournamentContext.Provider>
   );
 }

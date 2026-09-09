@@ -1,15 +1,30 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useParams } from 'react-router-dom';
 import { useAllTeams } from '../hooks/useAllTeams';
 import { TEAMS_CONFIG, getTeamDisplayName, getTeamOwner, getTeamLogo } from '../config/teamsConfig';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
+import { useTournament } from '../hooks/useTournament';
+import { useTournamentContext } from '../context/TournamentContext';
 
 // ─── TOURNAMENT ESPORTS POINTS TABLE & LEADERBOARD COMPONENT ────────────────
 export default function PointsTableLeaderboard({ transparentBg: propTransparentBg } = {}) {
+  const { id } = useParams();
   const { teams } = useAllTeams();
+  const { tournament: routeTournament } = useTournament(id);
+  const { tournament: contextTournament } = useTournamentContext();
+  const tournament = (id ? routeTournament : null) || contextTournament || routeTournament || { name: PLATFORM_CONFIG.name };
+  const tournamentName = tournament?.name ?? PLATFORM_CONFIG.name;
+
   const [internalTransparentBg, setInternalTransparentBg] = useState(false);
   const transparentBg = propTransparentBg !== undefined ? propTransparentBg : internalTransparentBg;
   const setTransparentBg = setInternalTransparentBg;
+
+  // Update browser tab title
+  React.useEffect(() => {
+    document.title = `${tournamentName} — Official Standings`;
+    return () => { document.title = PLATFORM_CONFIG.name; };
+  }, [tournamentName]);
 
   // Merge live database teams with configuration and stats
   const activeTeamsList = (teams && teams.length > 0 ? teams : TEAMS_CONFIG).map((t, idx) => {
@@ -128,7 +143,7 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-rajdhani font-black italic text-2xl sm:text-3xl text-white tracking-[0.12em] uppercase leading-none">
-                  {PLATFORM_CONFIG.name}
+                  {tournamentName}
                 </h1>
                 <span
                   style={{
@@ -362,7 +377,7 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
       <footer className="w-full relative z-20 flex-shrink-0 mt-2">
         <div className="w-full py-2 px-6 bg-black/70 border-t border-white/10 flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-widest">
           <div className="flex items-center gap-3">
-            <span className="text-amber-400 font-black">{PLATFORM_CONFIG.footerTag} {PLATFORM_CONFIG.year}</span>
+            <span className="text-amber-400 font-black">{tournamentName.toUpperCase()} {PLATFORM_CONFIG.year}</span>
             <span>•</span>
             <span>OFFICIAL AUCTION SERIES</span>
           </div>
