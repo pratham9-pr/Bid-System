@@ -244,6 +244,16 @@ export default function BroadcastOverlay() {
 
   const isSold = activePlayer?.status === 'sold';
 
+  if (!teams || teams.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-[#0a0a0c] flex flex-col items-center justify-center text-white/50 space-y-4">
+        <div className="w-16 h-16 border-t-2 border-orange-500 border-solid rounded-full animate-spin"></div>
+        <h1 className="text-xl tracking-[0.3em] font-bold uppercase">Awaiting Host Configuration</h1>
+        <p className="text-sm text-white/30">Please generate teams in the Admin Panel to begin the broadcast.</p>
+      </div>
+    );
+  }
+
   return (
     <TournamentContext.Provider value={{ tournament, loading: tournamentLoading }}>
       <div
@@ -354,13 +364,7 @@ export default function BroadcastOverlay() {
       {/* ===================================================================== */}
       {/* 2. MAIN BROADCAST VIEW: PRE-SETUP STANDBY vs STANDINGS vs AUCTION     */}
       {/* ===================================================================== */}
-      {tournamentLoading || !teams || teams.length === 0 ? (
-        <div className="flex-1 w-full h-full min-h-0 flex items-center justify-center relative z-10">
-          <span className="text-slate-500 text-xs uppercase tracking-[0.3em] font-rajdhani font-bold select-none">
-            AWAITING HOST CONFIGURATION
-          </span>
-        </div>
-      ) : activeView === 'standings' ? (
+      {activeView === 'standings' ? (
         <div className="flex-1 w-full h-full min-h-0 overflow-hidden relative z-10">
           <PointsTableLeaderboard transparentBg={transparentBg} />
         </div>
@@ -378,19 +382,23 @@ export default function BroadcastOverlay() {
           <main className="lg:col-span-6 w-full h-full min-h-0 flex flex-col justify-between items-center p-0 overflow-hidden relative">
             <div className="w-full h-full flex flex-col justify-between overflow-hidden relative">
               {/* 3D Flip Card Container stretching to the exact edges of the center stage */}
-              <div className="w-full flex-1 min-h-0 relative flex flex-col overflow-hidden">
-                <PlayerRevealCard player={activePlayer} isRevealed={isRevealed} auctionState={auctionState} />
+              {activePlayer ? (
+                <div className="w-full flex-1 min-h-0 relative flex flex-col overflow-hidden">
+                  <PlayerRevealCard player={activePlayer} isRevealed={isRevealed} auctionState={auctionState} />
 
-                {/* SOLD OUT Stamp Animation */}
-                <AnimatePresence>
-                  {isSold && (
-                    <SoldOutStamp
-                      winnerName={activePlayer?.current_highest_bidder_name}
-                      winningBid={activePlayer?.current_bid}
-                    />
-                  )}
-                </AnimatePresence>
-              </div>
+                  {/* SOLD OUT Stamp Animation */}
+                  <AnimatePresence>
+                    {isSold && (
+                      <SoldOutStamp
+                        winnerName={activePlayer?.current_highest_bidder_name}
+                        winningBid={activePlayer?.current_bid}
+                      />
+                    )}
+                  </AnimatePresence>
+                </div>
+              ) : (
+                <div className="flex-1" />
+              )}
 
               {/* Glowing Bid Counter HUD — Full-width flush footer */}
               {activePlayer && isRevealed && (
