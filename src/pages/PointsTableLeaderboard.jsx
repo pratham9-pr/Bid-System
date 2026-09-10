@@ -128,12 +128,18 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
               className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 p-0.5 flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.5)]"
             >
               <div className="w-full h-full bg-black flex items-center justify-center p-1">
-                <img
-                  src={tournament?.logo_url || '/logo.png'}
-                  alt={tournamentName}
-                  className="w-full h-full object-cover"
-                  onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
-                />
+                {tournament?.logo_url ? (
+                  <img
+                    src={tournament.logo_url}
+                    alt={tournamentName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                ) : (
+                  <span className="font-rajdhani font-black text-xl text-amber-400">
+                    {(tournamentName || 'T').charAt(0).toUpperCase()}
+                  </span>
+                )}
               </div>
             </div>
 

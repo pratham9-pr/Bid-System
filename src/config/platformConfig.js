@@ -15,9 +15,9 @@ export const PLATFORM_CONFIG = {
 
   /**
    * Generic fallback logo path for broken team-logo <img> onError handlers.
-   * Replaces the old '/demons_reign_logo.jpg' fallback everywhere.
+   * This is a neutral generic SVG — no tournament-specific branding.
    */
-  logoFallback: '/logo.png',
+  logoFallback: '/logo.svg',
 
   /** Current season / year label */
   year: '2026',

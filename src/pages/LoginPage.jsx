@@ -7,10 +7,11 @@ import { useTournamentContext } from '../context/TournamentContext';
 export default function LoginPage() {
   const navigate = useNavigate();
   const { tournament } = useTournamentContext();
-  const tournamentName = tournament?.name ?? PLATFORM_CONFIG.name;
+  const tournamentName = tournament?.name || '';
   const tournamentTagline = tournament?.sport_type
     ? `${tournament.sport_type.toUpperCase()} AUCTION ${PLATFORM_CONFIG.year}`
     : PLATFORM_CONFIG.tagline;
+  const tournamentLogo = tournament?.logo_url || null;
 
   // Update browser tab title
   React.useEffect(() => {
@@ -43,15 +44,19 @@ export default function LoginPage() {
           <div className="flex flex-col items-center lg:items-start gap-4">
             <div className="relative group">
               <div className="absolute -inset-3 bg-gradient-to-r from-fire-500/30 via-amber-500/20 to-fire-500/30 rounded-full blur-xl animate-pulse" />
-              <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full overflow-hidden border-2 border-amber-500/60 shadow-[0_0_40px_rgba(245,158,11,0.4)] relative z-10 bg-black/90 p-1">
-                <img
-                  src="/image_440ba2.jpg"
-                  alt={PLATFORM_CONFIG.name}
-                  className="w-full h-full object-cover object-center rounded-full transition-transform duration-700 group-hover:scale-105"
-                  onError={(e) => {
-                    e.currentTarget.src = PLATFORM_CONFIG.logoFallback;
-                  }}
-                />
+              <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 rounded-full overflow-hidden border-2 border-amber-500/60 shadow-[0_0_40px_rgba(245,158,11,0.4)] relative z-10 bg-black/90 p-1 flex items-center justify-center">
+                {tournamentLogo ? (
+                  <img
+                    src={tournamentLogo}
+                    alt={tournamentName || 'Tournament'}
+                    className="w-full h-full object-cover object-center rounded-full transition-transform duration-700 group-hover:scale-105"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                ) : (
+                  <span className="font-rajdhani font-black text-5xl sm:text-6xl text-amber-400 select-none">
+                    {(tournamentName || 'T').charAt(0).toUpperCase()}
+                  </span>
+                )}
               </div>
             </div>
 

@@ -1,28 +1,35 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { PLATFORM_CONFIG } from '../config/platformConfig';
 import { useTournamentContext } from '../context/TournamentContext';
 
 // ─── Platform Emblem for Card Front ──────────────────────────────────────────
 const CardFrontLogo = () => {
   const { tournament } = useTournamentContext();
-  const tournamentName = tournament?.name ?? PLATFORM_CONFIG.name;
+  const tournamentName = tournament?.name || '';
+  const logoUrl = tournament?.logo_url || null;
 
   return (
     <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 select-none">
       <div className="relative">
         <div className="absolute -inset-3 rounded-full bg-red-600/30 blur-2xl animate-pulse" />
-        <div className="w-20 h-20 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden border-2 border-red-500/60 shadow-[0_0_30px_rgba(239,68,68,0.4)] relative z-10 bg-black p-0.5">
-          <img
-            src={PLATFORM_CONFIG.logoFallback}
-            alt={tournamentName}
-            className="w-full h-full object-cover rounded-full"
-          />
+        <div className="w-20 h-20 sm:w-28 sm:h-28 lg:w-32 lg:h-32 rounded-full overflow-hidden border-2 border-red-500/60 shadow-[0_0_30px_rgba(239,68,68,0.4)] relative z-10 bg-black p-0.5 flex items-center justify-center">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={tournamentName || 'Tournament'}
+              className="w-full h-full object-cover rounded-full"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+          ) : (
+            <span className="font-rajdhani font-black text-4xl text-amber-400">
+              {(tournamentName || 'T').charAt(0).toUpperCase()}
+            </span>
+          )}
         </div>
       </div>
       <div className="text-center space-y-0.5 sm:space-y-1">
         <h3 className="font-rajdhani font-black italic text-xl sm:text-2xl tracking-[0.25em] text-white uppercase leading-tight drop-shadow-[0_2px_10px_rgba(239,68,68,0.5)]">
-          {tournamentName}
+          {tournamentName || 'OFFICIAL BROADCAST'}
         </h3>
         <p className="font-rajdhani font-black italic text-[10px] sm:text-xs tracking-[0.35em] text-fire-400 uppercase">
           OFFICIAL AUCTION CARD

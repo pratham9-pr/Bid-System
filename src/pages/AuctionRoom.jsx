@@ -20,8 +20,8 @@ export default function AuctionRoom() {
   const navigate = useNavigate();
   const { tournament: routeTournament } = useTournament(id);
   const { tournament: contextTournament } = useTournamentContext();
-  const tournament = (id ? routeTournament : null) || contextTournament || routeTournament || { name: PLATFORM_CONFIG.name };
-  const tournamentName = tournament?.name ?? PLATFORM_CONFIG.name;
+  const tournament = (id ? routeTournament : null) || contextTournament || routeTournament || null;
+  const tournamentName = tournament?.name || '';
 
   const effectiveTeam = team || (currentUser?.role === 'bidder' ? currentUser : null);
 
@@ -68,8 +68,12 @@ export default function AuctionRoom() {
                       border-b border-surface-600/40 bg-surface-900/80 backdrop-blur-sm
                       sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full overflow-hidden border border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.3)] bg-black flex-shrink-0">
-            <img src="/logo.png" alt={tournamentName} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
+          <div className="w-8 h-8 rounded-full overflow-hidden border border-amber-500/50 shadow-[0_0_10px_rgba(245,158,11,0.3)] bg-black flex-shrink-0 flex items-center justify-center">
+            {tournament?.logo_url ? (
+              <img src={tournament.logo_url} alt={tournamentName} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+            ) : (
+              <span className="font-rajdhani font-black text-xs text-amber-400">{(tournamentName || 'T').charAt(0).toUpperCase()}</span>
+            )}
           </div>
           <span className="font-rajdhani font-black italic text-white tracking-wider hidden sm:block uppercase">
             {tournamentName} Auction
