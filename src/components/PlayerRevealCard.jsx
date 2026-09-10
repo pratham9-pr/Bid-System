@@ -124,10 +124,8 @@ export function PlayerRevealCard({ player, activePlayer, isRevealed, auctionStat
             </div>
           </div>
 
-          {/* Center Flame Logo */}
-          <div className="relative z-10 my-auto py-2">
-            <CardFrontLogo />
-          </div>
+          {/* Center Flame Logo removed */}
+          <div className="relative z-10 my-auto py-2"></div>
 
           {/* Bottom Suspenseful Standby Badge */}
           <div className="relative z-10 flex items-center gap-2 px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-surface-800/95 border border-fire-500/30 shadow-[0_0_15px_rgba(249,115,22,0.2)]">
