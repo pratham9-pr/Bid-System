@@ -220,16 +220,16 @@ export default function BroadcastOverlay() {
   // Fetch tournament using active :id from URL, or fallback to general active tournament
   const { tournament: routeTournament, loading: tournamentLoading } = useTournament(id);
   const { tournament: contextTournament } = useTournamentContext();
-  const tournament = routeTournament || contextTournament || { name: PLATFORM_CONFIG.name };
-  const tournamentName = tournament?.name ?? PLATFORM_CONFIG.name;
+  const tournament = routeTournament || contextTournament || null;
+  const tournamentName = tournament?.name || '';
 
   const [transparentBg, setTransparentBg] = useState(false);
   const [activeView, setActiveView] = useState('auction'); // 'auction' | 'standings'
 
   // Update document title
   React.useEffect(() => {
-    document.title = `${tournamentName} — Live Broadcast`;
-    return () => { document.title = PLATFORM_CONFIG.name; };
+    document.title = tournamentName ? `${tournamentName} — Live Broadcast` : 'Live Broadcast';
+    return () => { document.title = 'Live Broadcast'; };
   }, [tournamentName]);
 
   // Synchronize remote broadcast view if broadcast by host
@@ -266,19 +266,19 @@ export default function BroadcastOverlay() {
         {/* Left: Branding */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border-2 border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] bg-black flex-shrink-0 p-0.5">
-            <img src={tournament?.logo_url || '/logo.png'} alt={tournamentName} className="w-full h-full object-cover rounded-full" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
+            <img src={tournament?.logo_url || '/logo.png'} alt={tournamentName || 'Tournament'} className="w-full h-full object-cover rounded-full" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-rajdhani font-black italic text-sm sm:text-base text-white tracking-wider leading-none uppercase">
-                {tournamentName}
+                {tournament?.name || ''}
               </h1>
               <span className="text-[9px] font-rajdhani font-bold px-2 py-0.5 rounded-full bg-fire-500/20 text-fire-300 border border-fire-500/30 uppercase hidden sm:inline">
                 STAGE LIVE
               </span>
             </div>
             <p className="font-rajdhani font-bold text-[9px] tracking-[0.25em] text-slate-400 uppercase mt-0.5">
-              {tournament?.sport_type ? `${tournament.sport_type.toUpperCase()} ` : ''}AUCTION SERIES {PLATFORM_CONFIG.year} • OFFICIAL BROADCAST
+              {tournament?.sport_type ? `${tournament.sport_type.toUpperCase()} ` : ''}AUCTION SERIES • OFFICIAL BROADCAST
             </p>
           </div>
         </div>
@@ -349,9 +349,54 @@ export default function BroadcastOverlay() {
       </header>
 
       {/* ===================================================================== */}
-      {/* 2. MAIN BROADCAST VIEW: AUCTION FLOOR vs POINTS TABLE                 */}
+      {/* 2. MAIN BROADCAST VIEW: PRE-SETUP STANDBY vs STANDINGS vs AUCTION     */}
       {/* ===================================================================== */}
-      {activeView === 'standings' ? (
+      {tournamentLoading || !teams || teams.length === 0 ? (
+        <div className="flex-1 w-full h-full min-h-0 flex flex-col items-center justify-center relative z-10 p-6">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+            className="flex flex-col items-center justify-center text-center p-8 sm:p-14 rounded-3xl bg-surface-900/40 border border-white/10 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.85)] max-w-lg w-full relative overflow-hidden"
+          >
+            {/* Ambient inner glow */}
+            <div className="absolute -inset-10 bg-amber-500/10 blur-3xl rounded-full pointer-events-none" />
+
+            {/* Pulsing Mascot / Tournament Logo */}
+            <div className="relative mb-6">
+              <div className="absolute -inset-4 rounded-full bg-amber-500/20 blur-2xl animate-pulse" />
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-2 border-amber-500/50 shadow-[0_0_35px_rgba(245,158,11,0.4)] relative z-10 bg-black p-1 flex items-center justify-center">
+                {tournament?.logo_url ? (
+                  <img
+                    src={tournament.logo_url}
+                    alt={tournament?.name || 'Tournament'}
+                    className="w-full h-full object-cover rounded-full animate-pulse"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                ) : (
+                  <span className="font-rajdhani font-black text-4xl text-amber-400 animate-pulse">
+                    {(tournament?.name || 'T').charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Title & Status */}
+            <div className="space-y-2 relative z-10">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-rajdhani font-black text-xs uppercase tracking-widest">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                BROADCAST STANDBY
+              </div>
+              <h2 className="font-rajdhani font-black italic text-2xl sm:text-3xl text-white tracking-widest uppercase leading-tight">
+                AWAITING HOST CONFIGURATION
+              </h2>
+              <p className="font-inter text-xs text-slate-400 max-w-sm mx-auto leading-relaxed pt-1">
+                The broadcast feed will activate automatically once franchise teams are configured in the Setup Wizard.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      ) : activeView === 'standings' ? (
         <div className="flex-1 w-full h-full min-h-0 overflow-hidden relative z-10">
           <PointsTableLeaderboard transparentBg={transparentBg} />
         </div>
@@ -359,15 +404,10 @@ export default function BroadcastOverlay() {
         <div className="flex-1 w-full p-2 sm:p-3 lg:p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-3.5 min-h-0 overflow-hidden relative z-10">
           {/* ── LEFT SIDEBAR (25% Width / Col 3): Dynamic First Half of Franchises ── */}
           <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
-            {teams.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center p-4 border border-dashed border-white/10 rounded-2xl text-center text-xs text-slate-500 font-inter">
-                No teams found. Please configure franchises in the Setup Wizard
-              </div>
-            ) : (
-              teams.slice(0, Math.max(1, Math.ceil(teams.length / 2))).map((team, idx) => (
-                <FranchiseSidebarCard key={team.id || idx} team={team} players={players} />
-              ))
-            )}
+            {teams.length > 0 &&
+              teams.slice(0, Math.ceil(teams.length / 2)).map((team) => (
+                <FranchiseSidebarCard key={team.id} team={team} players={players} />
+              ))}
           </aside>
 
           {/* ── CENTER STAGE (50% Width / Col 6): FULL-BLEED ACTIVE PLAYER CARD & HUD ── */}
@@ -471,11 +511,10 @@ export default function BroadcastOverlay() {
 
           {/* ── RIGHT SIDEBAR (25% Width / Col 3): Dynamic Second Half of Franchises ───── */}
           <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
-            {teams.length <= 1 ? null : (
-              teams.slice(Math.max(1, Math.ceil(teams.length / 2))).map((team, idx) => (
-                <FranchiseSidebarCard key={team.id || idx} team={team} players={players} />
-              ))
-            )}
+            {teams.length > 1 &&
+              teams.slice(Math.ceil(teams.length / 2)).map((team) => (
+                <FranchiseSidebarCard key={team.id} team={team} players={players} />
+              ))}
           </aside>
         </div>
       )}
@@ -484,7 +523,7 @@ export default function BroadcastOverlay() {
       {/* 3. MINIMALIST FOOTER TICKER                                           */}
       {/* ===================================================================== */}
       <footer className="w-full py-1 px-6 text-center border-t border-white/5 bg-black/60 backdrop-blur-sm text-[9px] font-inter text-slate-500 tracking-wider flex-shrink-0 flex items-center justify-between">
-        <span>{tournamentName.toUpperCase()} AUCTION SERIES {PLATFORM_CONFIG.year}</span>
+        <span>{tournamentName ? `${tournamentName.toUpperCase()} AUCTION SERIES` : 'OFFICIAL AUCTION BROADCAST'}</span>
         <span className="text-amber-400 font-rajdhani font-black uppercase tracking-widest hidden sm:inline">
           REAL-TIME SYNCHRONIZED BROADCAST
         </span>
