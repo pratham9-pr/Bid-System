@@ -212,7 +212,7 @@ function BalanceBar({ balance, starting = DEFAULT_TEAM_PURSE }) {
 }
 
 // ─── Individual team card ─────────────────────────────────────────────────────
-function TeamRosterCard({ team, allPlayers, onAppoint }) {
+export function TeamRosterCard({ team, allPlayers, onAppoint }) {
   const teamId = team.id;
   const { captain, auctionedPlayers, slots, totalCount, remainingSlots, isFull } = getTeamFullRoster(
     teamId,
@@ -354,7 +354,7 @@ export function TeamRosters({ teams, players, loading, onAppoint }) {
   if (teams.length === 0) {
     return (
       <div className="card p-12 text-center text-muted font-inter text-sm">
-        No teams found.
+        No teams found. Please configure franchises in the Setup Wizard
       </div>
     );
   }
@@ -447,4 +447,5 @@ export function TeamRosters({ teams, players, loading, onAppoint }) {
   );
 }
 
+export const TeamCard = TeamRosterCard;
 export default TeamRosters;

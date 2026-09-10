@@ -107,7 +107,12 @@ export function TeamLeaderboard({ teams = [] }) {
 
       {/* Rows */}
       <div className="flex flex-col gap-2.5">
-        {sorted.map((team, index) => {
+        {sorted.length === 0 ? (
+          <div className="py-12 text-center text-slate-400 font-bold tracking-wider uppercase text-sm border border-white/10 bg-[#13151f]">
+            No teams found. Please configure franchises in the Setup Wizard
+          </div>
+        ) : (
+          sorted.map((team, index) => {
           const rank = index + 1;
           const isRank1 = rank === 1;
           const isRank2 = rank === 2;
@@ -195,7 +200,8 @@ export function TeamLeaderboard({ teams = [] }) {
               </div>
             </div>
           );
-        })}
+        })
+      )}
       </div>
     </div>
   );
