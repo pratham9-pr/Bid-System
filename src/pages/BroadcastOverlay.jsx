@@ -208,8 +208,8 @@ import PointsTableLeaderboard from './PointsTableLeaderboard';
 export default function BroadcastOverlay() {
   const { id } = useParams();
   const { activePlayer, auctionPaused, isRevealed, auctionState } = useAuctionRoom(null);
-  const { teams } = useAllTeams();
-  const { players } = useAllPlayers();
+  const { teams } = useAllTeams(id);
+  const { players } = useAllPlayers(id);
 
   // Fetch tournament using active :id from URL, or fallback to general active tournament
   const { tournament: routeTournament, loading: tournamentLoading } = useTournament(id);

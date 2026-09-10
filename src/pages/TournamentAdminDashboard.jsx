@@ -23,11 +23,14 @@ export default function TournamentAdminDashboard() {
 
   const [tournament, setTournament] = useState(null);
   const [teams, setTeams]           = useState([]);
+  const [players, setPlayers]       = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
 
   useEffect(() => {
     if (!id) return;
+
+    let isMounted = true;
 
     const load = async () => {
       setLoading(true);
@@ -40,7 +43,7 @@ export default function TournamentAdminDashboard() {
           .eq("id", id)
           .single();
         if (tErr) throw tErr;
-        setTournament(t);
+        if (isMounted) setTournament(t);
 
         // Fetch all teams belonging to this tournament
         const { data: ts, error: tsErr } = await supabase
@@ -49,16 +52,51 @@ export default function TournamentAdminDashboard() {
           .eq("tournament_id", id)
           .order("name");
         if (tsErr) throw tsErr;
-        setTeams(ts ?? []);
+        if (isMounted) setTeams(ts ?? []);
+
+        // Fetch all players belonging to this tournament
+        const { data: ps, error: psErr } = await supabase
+          .from("players")
+          .select("*")
+          .eq("tournament_id", id)
+          .order("in_game_name");
+        if (psErr) throw psErr;
+        if (isMounted) setPlayers(ps ?? []);
       } catch (err) {
         console.error("[TournamentAdminDashboard] Load failed:", err);
-        setError(err?.message || "Failed to load tournament data.");
+        if (isMounted) setError(err?.message || "Failed to load tournament data.");
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     load();
+
+    // Realtime subscriptions filtered by active tournament id
+    const channelId = `admin_dash_${id}_${Math.random().toString(36).substring(2, 7)}`;
+    const channel = supabase
+      .channel(channelId)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "tournaments", filter: `id=eq.${id}` },
+        () => { if (isMounted) load(); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "teams", filter: `tournament_id=eq.${id}` },
+        () => { if (isMounted) load(); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "players", filter: `tournament_id=eq.${id}` },
+        () => { if (isMounted) load(); }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
   }, [id]);
 
   // Keep browser tab title in sync with active tournament
@@ -102,7 +140,7 @@ export default function TournamentAdminDashboard() {
   // ─── Dashboard ─────────────────────────────────────────────────────────────
 
   return (
-    <TournamentContext.Provider value={{ tournament, loading }}>
+    <TournamentContext.Provider value={{ tournament, teams, players, loading }}>
       <div className="min-h-screen bg-[#08080f] text-white">
         {/* Ambient glow */}
         <div className="pointer-events-none fixed -top-32 left-1/2 -translate-x-1/2
@@ -132,7 +170,7 @@ export default function TournamentAdminDashboard() {
         </header>
 
         {/* Stats bar */}
-        <div className="px-6 py-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="px-6 py-6 grid grid-cols-2 sm:grid-cols-5 gap-4">
           {[
             { label: "Sport",          value: tournament.sport_type },
             {
@@ -141,6 +179,7 @@ export default function TournamentAdminDashboard() {
             },
             { label: "Max Players",    value: `${tournament.max_players} / team` },
             { label: "Franchises",     value: teams.length },
+            { label: "Player Pool",    value: players.length },
           ].map((stat) => (
             <div
               key={stat.label}
@@ -155,9 +194,9 @@ export default function TournamentAdminDashboard() {
         </div>
 
         {/* Teams table */}
-        <div className="px-6 pb-12">
+        <div className="px-6 pb-8">
           <h2 className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-3">
-            Franchises
+            Franchises ({teams.length})
           </h2>
 
           {teams.length === 0 ? (
@@ -188,10 +227,63 @@ export default function TournamentAdminDashboard() {
                         transition-colors duration-150"
                     >
                       <td className="px-5 py-3.5 text-white/30 font-mono text-xs">{idx + 1}</td>
-                      <td className="px-5 py-3.5 font-medium text-white">{team.name}</td>
-                      <td className="px-5 py-3.5 text-white/60">{team.owner || "—"}</td>
+                      <td className="px-5 py-3.5 font-medium text-white">{team.name || team.team_name}</td>
+                      <td className="px-5 py-3.5 text-white/60">{team.owner || team.owner_name || "—"}</td>
                       <td className="px-5 py-3.5 text-right font-mono text-purple-300">
-                        ₹{Number(team.purse).toLocaleString("en-IN")}
+                        ₹{Number(team.purse ?? team.fire_coin_balance ?? 0).toLocaleString("en-IN")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Players table */}
+        <div className="px-6 pb-12">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-white/40 mb-3">
+            Registered Players Pool ({players.length})
+          </h2>
+
+          {players.length === 0 ? (
+            <p className="text-white/30 text-sm">No players registered yet.</p>
+          ) : (
+            <div className="rounded-2xl border border-white/8 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/8 bg-white/[0.02]">
+                    {["#", "Player Name", "Role"].map((h) => (
+                      <th
+                        key={h}
+                        className="text-left px-5 py-3 text-[10px] uppercase tracking-widest text-white/40 font-semibold"
+                      >
+                        {h}
+                      </th>
+                    ))}
+                    <th className="text-right px-5 py-3 text-[10px] uppercase tracking-widest text-white/40 font-semibold">
+                      Base Price
+                    </th>
+                    <th className="text-right px-5 py-3 text-[10px] uppercase tracking-widest text-white/40 font-semibold">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {players.map((player, idx) => (
+                    <tr
+                      key={player.id || idx}
+                      className="border-b border-white/5 last:border-none hover:bg-white/[0.02]
+                        transition-colors duration-150"
+                    >
+                      <td className="px-5 py-3.5 text-white/30 font-mono text-xs">{idx + 1}</td>
+                      <td className="px-5 py-3.5 font-medium text-white">{player.in_game_name || player.name}</td>
+                      <td className="px-5 py-3.5 text-white/60">{player.role || "—"}</td>
+                      <td className="px-5 py-3.5 text-right font-mono text-purple-300">
+                        ₹{Number(player.base_price || 0).toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-5 py-3.5 text-right font-mono text-xs uppercase text-white/50">
+                        {player.status || "upcoming"}
                       </td>
                     </tr>
                   ))}

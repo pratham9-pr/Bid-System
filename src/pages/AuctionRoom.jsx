@@ -26,7 +26,7 @@ export default function AuctionRoom() {
   const effectiveTeam = team || (currentUser?.role === 'bidder' ? currentUser : null);
 
   const { activePlayer, team: liveTeam, auctionPaused, isRevealed, biddingOpen, loading, error } = useAuctionRoom(effectiveTeam?.id || effectiveTeam?.teamId);
-  const { auctionPlayers } = useAllPlayers();
+  const { auctionPlayers } = useAllPlayers(id);
   const [notification, setNotification] = useState(null);
 
   const handleNotify  = useCallback((n) => setNotification(n), []);

@@ -10,7 +10,7 @@ import { useTournamentContext } from '../context/TournamentContext';
 // ─── TOURNAMENT ESPORTS POINTS TABLE & LEADERBOARD COMPONENT ────────────────
 export default function PointsTableLeaderboard({ transparentBg: propTransparentBg } = {}) {
   const { id } = useParams();
-  const { teams } = useAllTeams();
+  const { teams } = useAllTeams(id);
   const { tournament: routeTournament } = useTournament(id);
   const { tournament: contextTournament } = useTournamentContext();
   const tournament = (id ? routeTournament : null) || contextTournament || routeTournament || { name: PLATFORM_CONFIG.name };

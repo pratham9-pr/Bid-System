@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { isPermanentCaptainName } from '../config/franchiseCaptains';
 
@@ -11,17 +12,25 @@ import { isPermanentCaptainName } from '../config/franchiseCaptains';
  *   auctionPlayers — excludes captains (is_captain=true) — safe for bidding pools
  *   captains       — only appointed captains
  */
-export function useAllPlayers() {
+export function useAllPlayers(tournamentIdParam = null) {
+  const { id: routeId } = useParams();
+  const activeId = tournamentIdParam || routeId;
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
 
-  const fetchPlayers = async () => {
+  const fetchPlayers = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('players')
         .select('*')
         .order('in_game_name', { ascending: true });
+
+      if (activeId) {
+        query = query.eq('tournament_id', activeId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -47,7 +56,7 @@ export function useAllPlayers() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeId]);
 
   useEffect(() => {
     fetchPlayers();
@@ -60,6 +69,10 @@ export function useAllPlayers() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'players' },
         (payload) => {
+          // If activeId is specified and the payload row doesn't match activeId, skip optimistic update
+          if (activeId && payload.new?.tournament_id && payload.new.tournament_id !== activeId) {
+            return;
+          }
           // 1. Instantly apply realtime payload into React state without waiting for network re-fetch
           if (payload.eventType === 'UPDATE' && payload.new) {
             setPlayers((prev) => {
@@ -97,10 +110,10 @@ export function useAllPlayers() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchPlayers, activeId]);
 
   // ── Derived lists ──────────────────────────────────────────────────────────
-  // auctionPlayers: permanent captains (NX4 SILENT, MOKSHII FF) & any appointed captains are strictly excluded from general bidding
+  // auctionPlayers: captains and appointed franchise leaders are excluded from general bidding
   const auctionPlayers = players.filter(
     (p) =>
       !p.is_captain &&

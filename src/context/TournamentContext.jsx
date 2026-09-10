@@ -1,28 +1,22 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useTournament } from '../hooks/useTournament';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
+import { supabase } from '../config/supabase';
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 /**
  * TournamentContext
  *
- * Provides { tournament, loading } to any descendant component.
+ * Provides { tournament, teams, players, loading } to any descendant component.
  *
- * `tournament` shape:
- *   {
- *     id:             string | null,
- *     name:           string,          // e.g. "Neon Blitz Open" — always populated
- *     sport_type:     string | null,
- *     starting_purse: number | null,
- *     max_players:    number | null,
- *   }
- *
- * When no live tournament row is found, `tournament.name` falls back to
- * PLATFORM_CONFIG.name ("Tournament Platform") so no surface is ever blank.
+ * Default state arrays for teams and players are strictly empty arrays [],
+ * populated exclusively by dynamic Supabase queries filtered by active tournament ID.
  */
 export const TournamentContext = createContext({
   tournament: { id: null, name: PLATFORM_CONFIG.name, sport_type: null },
+  teams: [],
+  players: [],
   loading: true,
 });
 
@@ -40,10 +34,67 @@ export const TournamentContext = createContext({
  * @param {ReactNode}   children
  */
 export function TournamentProvider({ id = null, children }) {
-  const { tournament, loading } = useTournament(id);
+  const { tournament, loading: tournamentLoading } = useTournament(id);
+  const [teams, setTeams]     = useState([]);
+  const [players, setPlayers] = useState([]);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  useEffect(() => {
+    const activeId = id || tournament?.id;
+    if (!activeId) {
+      setTeams([]);
+      setPlayers([]);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchTournamentData = async () => {
+      setDataLoading(true);
+      try {
+        const [teamsRes, playersRes] = await Promise.all([
+          supabase.from('teams').select('*').eq('tournament_id', activeId).order('name'),
+          supabase.from('players').select('*').eq('tournament_id', activeId).order('in_game_name'),
+        ]);
+
+        if (isMounted) {
+          setTeams(teamsRes.data ?? []);
+          setPlayers(playersRes.data ?? []);
+        }
+      } catch (err) {
+        console.warn('[TournamentContext] data fetch failed:', err);
+      } finally {
+        if (isMounted) setDataLoading(false);
+      }
+    };
+
+    fetchTournamentData();
+
+    // Subscribe to realtime updates for this tournament's teams and players
+    const channelId = `tournament_ctx_${activeId}_${Math.random().toString(36).substring(2, 7)}`;
+    const channel = supabase
+      .channel(channelId)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'teams', filter: `tournament_id=eq.${activeId}` },
+        () => { if (isMounted) fetchTournamentData(); }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'players', filter: `tournament_id=eq.${activeId}` },
+        () => { if (isMounted) fetchTournamentData(); }
+      )
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [id, tournament?.id]);
+
+  const loading = tournamentLoading || dataLoading;
 
   return (
-    <TournamentContext.Provider value={{ tournament, loading }}>
+    <TournamentContext.Provider value={{ tournament, teams, players, loading }}>
       {children}
     </TournamentContext.Provider>
   );

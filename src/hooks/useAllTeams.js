@@ -1,27 +1,36 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { isPlayerAssignedToTeam } from '../config/franchiseCaptains';
 import { TEAMS_CONFIG, getTeamLogo } from '../config/teamsConfig';
 
-export function useAllTeams() {
+export function useAllTeams(tournamentIdParam = null) {
+  const { id: routeId } = useParams();
+  const activeId = tournamentIdParam || routeId;
   const [teams,   setTeams]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
 
   const fetchTeams = useCallback(async () => {
     try {
-      const { data: teamRows, error: teamErr } = await supabase
-        .from('teams')
-        .select('*');
+      let teamQuery = supabase.from('teams').select('*');
+      if (activeId) {
+        teamQuery = teamQuery.eq('tournament_id', activeId);
+      }
+      const { data: teamRows, error: teamErr } = await teamQuery;
 
       if (teamErr && (!teamRows || teamRows.length === 0)) {
         console.warn('useAllTeams query warning:', teamErr);
       }
 
       // Fetch drafted players to calculate true spent amount
-      const { data: playersData } = await supabase
+      let playersQuery = supabase
         .from('players')
         .select('id, sold_to_team_id, current_highest_bidder, sold_price, current_bid, is_captain, status, role');
+      if (activeId) {
+        playersQuery = playersQuery.eq('tournament_id', activeId);
+      }
+      const { data: playersData } = await playersQuery;
 
       const existingRows = teamRows || [];
 
@@ -82,7 +91,7 @@ export function useAllTeams() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeId]);
 
   useEffect(() => {
     fetchTeams();
