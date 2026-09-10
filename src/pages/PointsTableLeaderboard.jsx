@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useParams } from 'react-router-dom';
 import { useAllTeams } from '../hooks/useAllTeams';
-import { TEAMS_CONFIG, getTeamDisplayName, getTeamOwner, getTeamLogo } from '../config/teamsConfig';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
 import { useTournament } from '../hooks/useTournament';
 import { useTournamentContext } from '../context/TournamentContext';
@@ -29,9 +28,9 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
   // Merge live database teams with stats
   const activeTeamsList = (teams || []).map((t, idx) => {
     const teamId = t.id || `team_${idx + 1}`;
-    const displayName = getTeamDisplayName(teamId, t.team_name || t.name);
-    const ownerName = getTeamOwner(teamId, t.owner_name || t.owner);
-    const logoUrl = t.logo_url || t.logo || getTeamLogo(teamId);
+    const displayName = t.name || t.team_name || `Team ${idx + 1}`;
+    const ownerName = t.owner_name || t.owner || '—';
+    const logoUrl = t.logo_url || t.logo || null;
 
     const wins = typeof t.wins === 'number' ? t.wins : 0;
     const losses = typeof t.losses === 'number' ? t.losses : 0;
@@ -130,8 +129,8 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
             >
               <div className="w-full h-full bg-black flex items-center justify-center p-1">
                 <img
-                  src="/logo.png"
-                  alt={PLATFORM_CONFIG.name}
+                  src={tournament?.logo_url || '/logo.png'}
+                  alt={tournamentName}
                   className="w-full h-full object-cover"
                   onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
                 />
@@ -213,7 +212,17 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
 
           {/* ── Team Standings Rows (Aggressive Chamfered Thick Cards) ─────── */}
           <div className="flex flex-col gap-3">
-            {sortedTeams.map((team, index) => {
+            {sortedTeams.length === 0 ? (
+              <div
+                style={{
+                  clipPath: 'polygon(0% 0%, calc(100% - 20px) 0%, 100% 20px, 100% 100%, 20px 100%, 0% calc(100% - 20px))',
+                }}
+                className="w-full py-16 px-6 text-center text-slate-400 font-bold tracking-wider uppercase text-sm border border-white/10 bg-[#13141a]"
+              >
+                No teams found. Please configure franchises in the Setup Wizard
+              </div>
+            ) : (
+              sortedTeams.map((team, index) => {
               const rank = index + 1;
               const isRank1 = rank === 1;
               const isRank2 = rank === 2;
@@ -299,12 +308,18 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
                           : 'border border-white/20'}`}
                     >
                       <div className="w-full h-full bg-[#0d0e14] flex items-center justify-center p-1 overflow-hidden">
-                        <img
-                          src={team.logoUrl}
-                          alt={team.displayName}
-                          className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
-                        />
+                        {team.logoUrl ? (
+                          <img
+                            src={team.logoUrl}
+                            alt={team.displayName}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        ) : (
+                          <span className="font-rajdhani font-black text-xl text-amber-400">
+                            {team.displayName.charAt(0).toUpperCase()}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -363,7 +378,8 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
 
                 </motion.div>
               );
-            })}
+            })
+            )}
           </div>
 
         </div>

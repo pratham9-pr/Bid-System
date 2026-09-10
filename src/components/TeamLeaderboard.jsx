@@ -1,5 +1,4 @@
 import React from 'react';
-import { TEAMS_CONFIG, getTeamDisplayName, getTeamOwner, getTeamLogo, getTeamConfig } from '../config/teamsConfig';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
 import { useTournamentContext } from '../context/TournamentContext';
 
@@ -8,9 +7,9 @@ export function TeamLeaderboard({ teams = [] }) {
   const tournamentName = tournament?.name ?? PLATFORM_CONFIG.name;
   const activeTeamsList = (teams || []).map((t, idx) => {
     const teamId = t.id || `team_${idx + 1}`;
-    const displayName = getTeamDisplayName(teamId, t.team_name || t.name);
-    const ownerName = getTeamOwner(teamId, t.owner_name || t.owner);
-    const logoUrl = t.logo_url || t.logo || getTeamLogo(teamId);
+    const displayName = t.name || t.team_name || `Team ${idx + 1}`;
+    const ownerName = t.owner_name || t.owner || '—';
+    const logoUrl = t.logo_url || t.logo || null;
 
     const wins = typeof t.wins === 'number' ? t.wins : 0;
     const losses = typeof t.losses === 'number' ? t.losses : 0;
@@ -154,12 +153,18 @@ export function TeamLeaderboard({ teams = [] }) {
                   }}
                   className="w-9 h-9 p-0.5 flex-shrink-0 flex items-center justify-center bg-black border border-white/20"
                 >
-                  <img
-                    src={team.logoUrl}
-                    alt={team.displayName}
-                    className="w-full h-full object-cover"
-                    onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
-                  />
+                  {team.logoUrl ? (
+                    <img
+                      src={team.logoUrl}
+                      alt={team.displayName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  ) : (
+                    <span className="font-rajdhani font-black text-xs text-amber-400">
+                      {team.displayName.charAt(0).toUpperCase()}
+                    </span>
+                  )}
                 </div>
                 <div className="min-w-0">
                   <h3 className={`font-black italic text-base sm:text-lg uppercase tracking-wider truncate leading-tight

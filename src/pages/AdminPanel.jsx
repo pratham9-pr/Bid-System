@@ -9,7 +9,7 @@ import { TeamLeaderboard } from '../components/TeamLeaderboard';
 import { StandingsControlMatrix } from '../components/StandingsControlMatrix';
 import { AddPlayerForm } from '../components/AddPlayerForm';
 import { TeamRosters } from '../components/TeamRosters';
-import { getTeamDisplayName, TEAMS_CONFIG } from '../config/teamsConfig';
+import { getTeamDisplayName } from '../config/teamsConfig';
 import { seedDatabase, hardResetDatabase, revealPlayer, hidePlayer, startBidding, closeBidding, manualSellToTeam, setBroadcastView } from '../services/auctionService';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
 import { useTournamentContext } from '../context/TournamentContext';

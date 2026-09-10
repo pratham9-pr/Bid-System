@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import { isPlayerAssignedToTeam } from '../config/franchiseCaptains';
-import { TEAMS_CONFIG, getTeamLogo } from '../config/teamsConfig';
 
 export function useAllTeams(tournamentIdParam = null) {
   const { id: routeId } = useParams();
@@ -61,8 +60,9 @@ export function useAllTeams(tournamentIdParam = null) {
         return {
           ...found,
           id: teamId,
+          name: found.name || found.team_name || `Team ${idx + 1}`,
           team_name: found.team_name || found.name || `Team ${idx + 1}`,
-          owner_name: found.owner_name || found.owner || 'Franchise Owner',
+          owner_name: found.owner_name || found.owner || '—',
           owner_email: found.owner_email || `${teamId}@tournament.auction`,
           matches_played: typeof found.matches_played === 'number'
             ? found.matches_played
@@ -74,7 +74,8 @@ export function useAllTeams(tournamentIdParam = null) {
           points: ptsNum,
           pts: ptsNum,
           fire_coin_balance: balance,
-          logo: found.logo_url || found.logo || getTeamLogo(teamId),
+          logo: found.logo_url || found.logo || null,
+          logo_url: found.logo_url || found.logo || null,
         };
       });
 

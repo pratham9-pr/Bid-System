@@ -5,7 +5,7 @@ import { useAuctionRoom } from '../hooks/useAuctionRoom';
 import { useAllTeams } from '../hooks/useAllTeams';
 import { useAllPlayers } from '../hooks/useAllPlayers';
 import { PlayerRevealCard } from '../components/PlayerRevealCard';
-import { getTeamDisplayName, getTeamOwner, getTeamLogo, getTeamTheme, TEAMS_CONFIG } from '../config/teamsConfig';
+import { getTeamTheme } from '../config/teamsConfig';
 import { getTeamFullRoster } from '../config/franchiseCaptains';
 import { MAX_BID_LIMIT } from '../services/auctionService';
 import { PLATFORM_CONFIG } from '../config/platformConfig';
@@ -70,16 +70,16 @@ function SoldOutStamp({ winnerName, winningBid }) {
 }
 
 // ─── Vertical Franchise Roster Card (Sidebar Column Item) ─────────────────────
-function FranchiseSidebarCard({ teamId, teams, players }) {
-  const teamRecord = (teams || []).find((t) => String(t.id).toLowerCase() === String(teamId).toLowerCase()) || {};
-
-  const displayName = getTeamDisplayName(teamId, teamRecord.team_name || teamRecord.name);
-  const ownerName = getTeamOwner(teamId, teamRecord.owner_name || teamRecord.owner);
-  const logoUrl = getTeamLogo(teamId);
-  const balance = teamRecord.fire_coin_balance ?? 40000;
+function FranchiseSidebarCard({ team, players }) {
+  if (!team) return null;
+  const teamId = team.id;
+  const displayName = team.name || team.team_name || 'Team';
+  const ownerName = team.owner_name || team.owner || '—';
+  const logoUrl = team.logo_url || team.logo || null;
+  const balance = team.fire_coin_balance ?? team.purse ?? 40000;
 
   const { slots = [null, null, null, null], totalCount = 0, remainingSlots = 4, isFull = false } = getTeamFullRoster(teamId, players);
-  const themeClasses = getTeamTheme(teamId);
+  const themeClasses = getTeamTheme(team.id);
 
   return (
     <div
@@ -90,12 +90,18 @@ function FranchiseSidebarCard({ teamId, teams, players }) {
         <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/10">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-md">
-              <img
-                src={logoUrl}
-                alt={displayName}
-                className="w-full h-full object-cover rounded-full"
-                onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
-              />
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={displayName}
+                  className="w-full h-full object-cover rounded-full"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center font-rajdhani font-bold text-xs text-amber-400">
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
@@ -260,7 +266,7 @@ export default function BroadcastOverlay() {
         {/* Left: Branding */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border-2 border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] bg-black flex-shrink-0 p-0.5">
-            <img src="/image_440ba2.jpg" alt={tournamentName} className="w-full h-full object-cover rounded-full" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
+            <img src={tournament?.logo_url || '/logo.png'} alt={tournamentName} className="w-full h-full object-cover rounded-full" onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }} />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -353,9 +359,15 @@ export default function BroadcastOverlay() {
         <div className="flex-1 w-full p-2 sm:p-3 lg:p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-3.5 min-h-0 overflow-hidden relative z-10">
           {/* ── LEFT SIDEBAR (25% Width / Col 3): Dynamic First Half of Franchises ── */}
           <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
-            {teams.slice(0, Math.max(1, Math.ceil(teams.length / 2))).map((team, idx) => (
-              <FranchiseSidebarCard key={team.id || idx} teamId={team.id} teams={teams} players={players} />
-            ))}
+            {teams.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center p-4 border border-dashed border-white/10 rounded-2xl text-center text-xs text-slate-500 font-inter">
+                No teams found. Please configure franchises in the Setup Wizard
+              </div>
+            ) : (
+              teams.slice(0, Math.max(1, Math.ceil(teams.length / 2))).map((team, idx) => (
+                <FranchiseSidebarCard key={team.id || idx} team={team} players={players} />
+              ))
+            )}
           </aside>
 
           {/* ── CENTER STAGE (50% Width / Col 6): FULL-BLEED ACTIVE PLAYER CARD & HUD ── */}
@@ -406,38 +418,52 @@ export default function BroadcastOverlay() {
                     </span>
                   </div>
 
-                  {/* Leading Team Info with Mascot Logo */}
-                  <div className="mt-1.5 pt-1.5 border-t border-white/10 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-md">
-                        <img
-                          src={getTeamLogo(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id)}
-                          alt="Leading Team"
-                          className="w-full h-full object-cover rounded-full"
-                          onError={(e) => { e.currentTarget.src = PLATFORM_CONFIG.logoFallback; }}
-                        />
-                      </div>
-                      <div className="text-left min-w-0">
-                        <span className="text-[8px] text-slate-400 uppercase font-rajdhani font-bold block leading-none">
-                          {isSold ? 'Acquired By' : 'Leading Franchise'}
-                        </span>
-                        <span className="text-xs sm:text-sm font-rajdhani font-black text-white uppercase tracking-wide leading-tight truncate block mt-0.5">
-                          {activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id
-                            ? getTeamDisplayName(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id, activePlayer.current_highest_bidder_name)
-                            : 'AWAITING FIRST BID'}
-                        </span>
-                      </div>
-                    </div>
+                  {/* Leading Team Info with Logo */}
+                  {(() => {
+                    const leaderTeamId = activePlayer?.current_highest_bidder || auctionState?.highest_bidder_team_id;
+                    const leaderTeam = leaderTeamId ? (teams || []).find((t) => String(t.id).toLowerCase() === String(leaderTeamId).toLowerCase()) : null;
+                    const leaderTeamName = leaderTeam?.name || leaderTeam?.team_name || activePlayer?.current_highest_bidder_name || (leaderTeamId ? 'Leading Team' : 'AWAITING FIRST BID');
+                    const leaderTeamLogo = leaderTeam?.logo_url || leaderTeam?.logo || null;
+                    const leaderTeamOwner = leaderTeam?.owner_name || leaderTeam?.owner || '—';
 
-                    <div className="text-right flex-shrink-0">
-                      <span className="text-[8px] text-slate-400 font-inter uppercase tracking-wider block">
-                        Owner
-                      </span>
-                      <span className="text-xs font-rajdhani font-bold text-amber-300 uppercase">
-                        {getTeamOwner(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id)}
-                      </span>
-                    </div>
-                  </div>
+                    return (
+                      <div className="mt-1.5 pt-1.5 border-t border-white/10 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-md">
+                            {leaderTeamLogo ? (
+                              <img
+                                src={leaderTeamLogo}
+                                alt={leaderTeamName}
+                                className="w-full h-full object-cover rounded-full"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center font-rajdhani font-bold text-xs text-amber-400">
+                                {leaderTeamName.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-left min-w-0">
+                            <span className="text-[8px] text-slate-400 uppercase font-rajdhani font-bold block leading-none">
+                              {isSold ? 'Acquired By' : 'Leading Franchise'}
+                            </span>
+                            <span className="text-xs sm:text-sm font-rajdhani font-black text-white uppercase tracking-wide leading-tight truncate block mt-0.5">
+                              {leaderTeamName}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right flex-shrink-0">
+                          <span className="text-[8px] text-slate-400 font-inter uppercase tracking-wider block">
+                            Owner
+                          </span>
+                          <span className="text-xs font-rajdhani font-bold text-amber-300 uppercase">
+                            {leaderTeamId ? leaderTeamOwner : '—'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </motion.div>
               )}
             </div>
@@ -445,9 +471,11 @@ export default function BroadcastOverlay() {
 
           {/* ── RIGHT SIDEBAR (25% Width / Col 3): Dynamic Second Half of Franchises ───── */}
           <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
-            {teams.slice(Math.max(1, Math.ceil(teams.length / 2))).map((team, idx) => (
-              <FranchiseSidebarCard key={team.id || idx} teamId={team.id} teams={teams} players={players} />
-            ))}
+            {teams.length <= 1 ? null : (
+              teams.slice(Math.max(1, Math.ceil(teams.length / 2))).map((team, idx) => (
+                <FranchiseSidebarCard key={team.id || idx} team={team} players={players} />
+              ))
+            )}
           </aside>
         </div>
       )}
