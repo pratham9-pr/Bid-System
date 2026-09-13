@@ -49,38 +49,7 @@ const STATE_ROW = 1;
 
 export function isActiveFranchise(teamId) {
   if (!teamId) return false;
-  const clean = String(teamId).toLowerCase().trim();
-  return (
-    clean === 'alpha_wolves' ||
-    clean === 'team_alpha' ||
-    clean === 'power_hawks' ||
-    clean === 'power hawks' ||
-    clean === 'alpha' ||
-    clean === '1' ||
-    clean === 'beta_strikers' ||
-    clean === 'team_beta' ||
-    clean === 'team_vortex' ||
-    clean === 'team vortex' ||
-    clean === 'beta' ||
-    clean === 'vortex' ||
-    clean === '2' ||
-    clean === 'gamma_reapers' ||
-    clean === 'team_gamma' ||
-    clean === 'abyssal_ebon' ||
-    clean === 'abyssal ebon' ||
-    clean === 'abyssal' ||
-    clean === 'ebon' ||
-    clean === 'gamma' ||
-    clean === '3' ||
-    clean === 'delta_phantoms' ||
-    clean === 'team_delta' ||
-    clean === 'rx_kudla' ||
-    clean === 'rx kudla' ||
-    clean === 'rx' ||
-    clean === 'kudla' ||
-    clean === 'delta' ||
-    clean === '4'
-  );
+  return String(teamId).trim() !== '';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -167,9 +136,12 @@ export async function placeBid(playerId, teamId, bidAmount) {
       return { success: false, error: 'Team record not found.' };
     }
 
-    const teamBalance = typeof teamData.fire_coin_balance === 'number' ? teamData.fire_coin_balance : 40000;
+    const teamBalance = typeof teamData.budget === 'number'
+      ? teamData.budget
+      : (typeof teamData.fire_coin_balance === 'number' ? teamData.fire_coin_balance : 40000);
+
     if (teamBalance < numericBid) {
-      return { success: false, error: `Insufficient Fire Coins! Balance: ₣${teamBalance.toLocaleString()}` };
+      return { success: false, error: `Insufficient Budget! Balance: ₣${teamBalance.toLocaleString()}` };
     }
 
     const teamDisplayName = getTeamDisplayName(cleanTeamId, teamData.team_name || teamData.name);
@@ -193,6 +165,7 @@ export async function placeBid(playerId, teamId, bidAmount) {
       await supabase
         .from('teams')
         .update({
+          budget:            newBalance,
           fire_coin_balance: newBalance,
           last_bid_time:     new Date().toISOString(),
         })
@@ -238,13 +211,38 @@ export async function placeBid(playerId, teamId, bidAmount) {
   }
 }
 
+// ─── Safe live_auction updater (Central Single-Row Source of Truth) ───────────
+async function safeUpdateLiveAuction(payload) {
+  try {
+    const livePayload = {};
+    if (payload.active_player_id !== undefined) livePayload.current_player_id = payload.active_player_id;
+    if (payload.current_player_id !== undefined) livePayload.current_player_id = payload.current_player_id;
+    if (payload.current_bid !== undefined) livePayload.highest_bid = safeNum(payload.current_bid, 0);
+    if (payload.highest_bid !== undefined) livePayload.highest_bid = safeNum(payload.highest_bid, 0);
+    if (payload.highest_bidder_team_id !== undefined) livePayload.highest_bidder_id = payload.highest_bidder_team_id;
+    if (payload.highest_bidder_id !== undefined) livePayload.highest_bidder_id = payload.highest_bidder_id;
+    if (payload.auction_paused !== undefined) livePayload.is_paused = payload.auction_paused;
+    if (payload.is_paused !== undefined) livePayload.is_paused = payload.is_paused;
+    if (payload.is_revealed !== undefined) livePayload.is_revealed = payload.is_revealed;
+    if (payload.bidding_open !== undefined) livePayload.bidding_open = payload.bidding_open;
+    if (payload.status !== undefined) livePayload.status = payload.status;
+    livePayload.updated_at = new Date().toISOString();
+
+    await supabase
+      .from('live_auction')
+      .upsert({ id: 'current', ...livePayload }, { onConflict: 'id' });
+  } catch (e) {
+    console.warn('safeUpdateLiveAuction warning:', e);
+  }
+}
+
 // ─── Safe auction_state updater ─────────────────────────────────────────────
-// Always uses the integer id=1 singleton row. Never passes string literals
-// like 'current' to integer columns — that causes: invalid input syntax for integer.
 async function safeUpdateAuctionState(payload) {
   try {
-    // Sanitize any numeric fields in the payload so they are always proper numbers,
-    // never strings or 'current', before sending to Postgres.
+    // Keep live_auction synchronized as central broadcast source of truth
+    await safeUpdateLiveAuction(payload);
+
+    // Sanitize any numeric fields in the payload
     const safePayload = { ...payload };
     if ('current_bid'   in safePayload) safePayload.current_bid   = safeNum(safePayload.current_bid, 0);
     if ('max_bid_limit' in safePayload) safePayload.max_bid_limit = safeNum(safePayload.max_bid_limit, MAX_BID_LIMIT);
@@ -258,7 +256,6 @@ async function safeUpdateAuctionState(payload) {
     const existingRow = existingRows && existingRows[0];
 
     if (!existingRow) {
-      // Row doesn't exist yet — create it with id=1 (integer, never 'current')
       const { data: inserted, error: insertErr } = await supabase
         .from('auction_state')
         .insert({ id: 1, ...safePayload })
@@ -266,8 +263,6 @@ async function safeUpdateAuctionState(payload) {
         .maybeSingle();
 
       if (insertErr) {
-        // Insert failed (likely a concurrent race that already created the row).
-        // Fall back to upsert with id=1 — NEVER use string 'current'.
         console.warn('auction_state insert race — falling back to upsert:', insertErr.message);
         const { data: upserted, error: upsertErr } = await supabase
           .from('auction_state')
@@ -279,7 +274,7 @@ async function safeUpdateAuctionState(payload) {
       return { data: inserted, error: null };
     }
 
-    // 2. Row exists — update it using its actual id value (could be 1 or UUID)
+    // 2. Row exists — update it using its actual id value
     const rowId = existingRow.id;
 
     let { data, error } = await supabase
@@ -533,11 +528,15 @@ export async function forcePlayerSold(playerId) {
     }
 
     // 4. Deduct balance from winning team
-    if (teamData && typeof teamData.fire_coin_balance === 'number') {
-      const newBal = Math.max(0, teamData.fire_coin_balance - sellPrice);
+    if (teamData) {
+      const currentBal = typeof teamData.budget === 'number'
+        ? teamData.budget
+        : (typeof teamData.fire_coin_balance === 'number' ? teamData.fire_coin_balance : 40000);
+      const newBal = Math.max(0, currentBal - sellPrice);
       await supabase
         .from('teams')
         .update({
+          budget: newBal,
           fire_coin_balance: newBal,
           last_bid_time: new Date().toISOString(),
         })
@@ -605,7 +604,7 @@ export async function manualSellToTeam(playerId, teamId, teamName, price) {
 
     if (playerError) return { success: false, error: playerError.message };
 
-    // 3. Update auction_state row 1 (integer)
+    // 3. Update auction_state and live_auction
     await safeUpdateAuctionState({
       status:                 'sold',
       bidding_open:           false,
@@ -617,15 +616,22 @@ export async function manualSellToTeam(playerId, teamId, teamName, price) {
     // 4. Deduct sell price from winning team's balance
     const { data: teamData } = await supabase
       .from('teams')
-      .select('fire_coin_balance')
+      .select('budget, fire_coin_balance')
       .eq('id', tId)
       .maybeSingle();
 
-    if (teamData && typeof teamData.fire_coin_balance === 'number') {
-      const newBalance = Math.max(0, teamData.fire_coin_balance - sellPrice);
+    if (teamData) {
+      const currentBal = typeof teamData.budget === 'number'
+        ? teamData.budget
+        : (typeof teamData.fire_coin_balance === 'number' ? teamData.fire_coin_balance : 40000);
+      const newBalance = Math.max(0, currentBal - sellPrice);
       await supabase
         .from('teams')
-        .update({ fire_coin_balance: newBalance })
+        .update({
+          budget: newBalance,
+          fire_coin_balance: newBalance,
+          last_bid_time: new Date().toISOString(),
+        })
         .eq('id', tId);
     }
 
@@ -941,110 +947,31 @@ export async function removePlayerFromRoster(playerId) {
 // ─────────────────────────────────────────────────────────────────────────────
 export async function resetAllRostersAndCaptains() {
   try {
-    // 1. Fetch all players to reset their bids to their own base_price
+    // 1. Fetch all players to reset their bids to their own base_price and mark unassigned
     const { data: allP } = await supabase.from('players').select('id, in_game_name, name, base_price');
 
     if (allP && allP.length > 0) {
       for (const p of allP) {
-        const pName = (p.in_game_name || p.name || '').toLowerCase().trim();
-        const isNx4 = pName.includes('nx4') || pName.includes('silent') || p.id === 'CAP_NX4_SILENT';
-        const isMokshii = pName.includes('mokshii') || p.id === 'CAP_MOKSHII_FF';
-        const isInvincible = pName.includes('invincible') || p.id === 'CAP_INVINCIBLE';
-        const isRxKaushii = pName.includes('kaushii') || p.id === 'CAP_RX_KAUSHII';
-
-        if (isNx4) {
-          // Lock NX4 SILENT as Permanent Captain for POWER HAWKS
-          await safeUpdatePlayer(p.id, {
-            status:                      'sold',
-            is_captain:                  true,
-            role:                        'IGL',
-            sold_to_team_id:             'alpha_wolves',
-            current_highest_bidder:      'alpha_wolves',
-            current_highest_bidder_name: 'POWER HAWKS',
-            sold_price:                  0,
-            current_bid:                 0,
-          });
-        } else if (isMokshii) {
-          // Lock MOKSHII FF as Permanent Captain for TEAM VORTEX
-          await safeUpdatePlayer(p.id, {
-            status:                      'sold',
-            is_captain:                  true,
-            role:                        'IGL',
-            sold_to_team_id:             'beta_strikers',
-            current_highest_bidder:      'beta_strikers',
-            current_highest_bidder_name: 'TEAM VORTEX',
-            sold_price:                  0,
-            current_bid:                 0,
-          });
-        } else if (isInvincible) {
-          // Lock invincible as Permanent Captain for Abyssal Ebon
-          await safeUpdatePlayer(p.id, {
-            status:                      'sold',
-            is_captain:                  true,
-            role:                        'IGL',
-            sold_to_team_id:             'gamma_reapers',
-            current_highest_bidder:      'gamma_reapers',
-            current_highest_bidder_name: 'Abyssal Ebon',
-            sold_price:                  0,
-            current_bid:                 0,
-          });
-        } else if (isRxKaushii) {
-          // Lock RX KAUSHII as Permanent Captain for RX KUDLA
-          await safeUpdatePlayer(p.id, {
-            status:                      'sold',
-            is_captain:                  true,
-            role:                        'IGL',
-            sold_to_team_id:             'delta_phantoms',
-            current_highest_bidder:      'delta_phantoms',
-            current_highest_bidder_name: 'RX KUDLA',
-            sold_price:                  0,
-            current_bid:                 0,
-          });
-        } else {
-          // General Auction Pool Player
-          await safeUpdatePlayer(p.id, {
-            status:                      'upcoming',
-            is_captain:                  false,
-            sold_to_team_id:             null,
-            sold_price:                  0,
-            current_highest_bidder:      null,
-            current_highest_bidder_name: null,
-            current_bid:                 p.base_price || 0,
-          });
-        }
+        await safeUpdatePlayer(p.id, {
+          status:                      'upcoming',
+          is_captain:                  false,
+          sold_to_team_id:             null,
+          sold_price:                  0,
+          current_highest_bidder:      null,
+          current_highest_bidder_name: null,
+          current_bid:                 p.base_price || 0,
+        });
       }
     }
 
-    // 2. Reset team balances to default purse (40,000 FC) and sync names
+    // 2. Reset team balances to default purse (40,000 FC) across all dynamic teams
     await supabase.from('teams').update({
-      team_name:         'POWER HAWKS',
-      owner_name:        'NX4 SILENT',
+      budget:            DEFAULT_TEAM_PURSE,
       fire_coin_balance: DEFAULT_TEAM_PURSE,
       last_bid_time:     null,
-    }).or('id.eq.alpha_wolves,id.eq.TEAM_ALPHA');
+    }).neq('id', '___ZERO_MATCH___');
 
-    await supabase.from('teams').update({
-      team_name:         'TEAM VORTEX',
-      owner_name:        'MOKSHII FF',
-      fire_coin_balance: DEFAULT_TEAM_PURSE,
-      last_bid_time:     null,
-    }).or('id.eq.beta_strikers,id.eq.TEAM_BETA');
-
-    await supabase.from('teams').update({
-      team_name:         'ABYSSAL EBON',
-      owner_name:        'invincible',
-      fire_coin_balance: DEFAULT_TEAM_PURSE,
-      last_bid_time:     null,
-    }).or('id.eq.gamma_reapers,id.eq.TEAM_GAMMA');
-
-    await supabase.from('teams').update({
-      team_name:         'RX KUDLA',
-      owner_name:        'RX KAUSHII',
-      fire_coin_balance: DEFAULT_TEAM_PURSE,
-      last_bid_time:     null,
-    }).or('id.eq.delta_phantoms,id.eq.TEAM_DELTA');
-
-    // 3. Reset auction state
+    // 3. Reset auction state and live_auction to idle
     await safeUpdateAuctionState({
       active_player_id:        null,
       is_revealed:             false,
@@ -1075,7 +1002,6 @@ export async function seedDatabase() {
       console.warn('RPC seed warning:', e);
     }
 
-    // Direct guarantee: Reset all team balances to 40,000 FC, assign permanent captains
     const resetRes = await resetAllRostersAndCaptains();
     if (!resetRes.success && !rpcRes) {
       return { success: false, error: resetRes.error };
@@ -1083,7 +1009,7 @@ export async function seedDatabase() {
 
     return {
       success: true,
-      message: rpcRes?.message || 'All teams successfully reset to ₣40,000 FC starting purse!',
+      message: rpcRes?.message || 'All dynamic team rosters successfully reset to ₣40,000 starting purse!',
     };
   } catch (err) {
     return { success: false, error: err.message };
@@ -1091,11 +1017,11 @@ export async function seedDatabase() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  HARD RESET & PURGE (Deletes all players, clears state, resets all 4 purses to 40,000)
+//  HARD RESET & PURGE (Deletes all players, clears state, restores dynamic team budgets)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function hardResetDatabase() {
   try {
-    // 1. Reset auction state to idle & clear active player
+    // 1. Reset auction state and live_auction to idle & clear active player
     await safeUpdateAuctionState({
       active_player_id:        null,
       is_revealed:             false,
@@ -1115,7 +1041,6 @@ export async function hardResetDatabase() {
 
     if (delErr) {
       console.warn('Direct delete warning, attempting batch delete:', delErr.message);
-      // Fallback: fetch all player IDs and delete
       const { data: allP } = await supabase.from('players').select('id');
       if (allP && allP.length > 0) {
         for (const p of allP) {
@@ -1124,25 +1049,25 @@ export async function hardResetDatabase() {
       }
     }
 
-    // 3. Reset all 4 franchise team records to 40,000 FC and clear timestamps
-    const teamConfigs = [
-      { id: 'alpha_wolves',   name: 'POWER HAWKS',   owner: 'NX4 SILENT',   alt: 'TEAM_ALPHA' },
-      { id: 'beta_strikers',  name: 'TEAM VORTEX',   owner: 'MOKSHII FF',   alt: 'TEAM_BETA' },
-      { id: 'gamma_reapers',  name: 'ABYSSAL EBON',  owner: 'invincible',   alt: 'TEAM_GAMMA' },
-      { id: 'delta_phantoms', name: 'RX KUDLA',      owner: 'RX KAUSHII',   alt: 'TEAM_DELTA' },
-    ];
+    // 3. Purge hardcoded dummy teams if present
+    await supabase
+      .from('teams')
+      .delete()
+      .in('id', [
+        'alpha_wolves', 'beta_strikers', 'gamma_reapers', 'delta_phantoms',
+        'TEAM_ALPHA', 'TEAM_BETA', 'TEAM_GAMMA', 'TEAM_DELTA',
+        'team_alpha', 'team_beta', 'team_gamma', 'team_delta'
+      ]);
 
-    for (const t of teamConfigs) {
-      await supabase
-        .from('teams')
-        .update({
-          team_name:         t.name,
-          owner_name:        t.owner,
-          fire_coin_balance: 40000,
-          last_bid_time:     null,
-        })
-        .or(`id.eq.${t.id},id.eq.${t.alt}`);
-    }
+    // 4. Restore dynamic team purses to default 40,000 FC
+    await supabase
+      .from('teams')
+      .update({
+        budget:            40000,
+        fire_coin_balance: 40000,
+        last_bid_time:     null,
+      })
+      .neq('id', '___ZERO_MATCH___');
 
     // 4. Clear local storage caches for clean state
     try {
