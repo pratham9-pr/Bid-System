@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { TEAMS_CONFIG } from '../config/teamsConfig';
+import { useAllTeams } from '../hooks/useAllTeams';
+import { getTeamLogo } from '../config/teamsConfig';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const LockIcon = () => (
@@ -41,6 +42,7 @@ const ShieldCheckIcon = () => (
 export function Login({ onSuccess }) {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { teams, loading: teamsLoading } = useAllTeams();
 
   // ── Two-Step State: null (Selection Phase) or role string (Password Phase) ──
   const [selectedRole, setSelectedRole] = useState(null);
@@ -49,8 +51,13 @@ export function Login({ onSuccess }) {
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState('');
 
+  // Direct PIN quick entry
+  const [directPin,    setDirectPin]    = useState('');
+  const [directLoading, setDirectLoading] = useState(false);
+  const [directError,  setDirectError]  = useState('');
+
   // Selected Team metadata
-  const currentTeam = TEAMS_CONFIG.find((t) => t.id === selectedRole);
+  const currentTeam = (teams || []).find((t) => t.id === selectedRole);
   const isAdminRole = selectedRole === 'admin';
 
   const handleSelectRole = (roleId) => {
@@ -70,7 +77,7 @@ export function Login({ onSuccess }) {
     const p = password.trim();
 
     if (!p) {
-      setError('Please enter your password.');
+      setError(isAdminRole ? 'Please enter the admin password.' : 'Please enter your team access PIN.');
       return;
     }
 
@@ -86,10 +93,32 @@ export function Login({ onSuccess }) {
       setError(
         isFetchError
           ? 'Unable to connect to database server. Please check your internet connection or Supabase settings.'
-          : (err.message || 'Invalid Password / Access Denied')
+          : (err.message || 'Invalid Access PIN / Denied')
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDirectPinSubmit = async (e) => {
+    if (e) e.preventDefault();
+    const p = directPin.trim();
+    if (!p) {
+      setDirectError('Please enter your owner access PIN.');
+      return;
+    }
+
+    setDirectError('');
+    setDirectLoading(true);
+
+    try {
+      const user = await login(null, p);
+      onSuccess?.(user);
+      navigate(user.redirect || '/bidder');
+    } catch (err) {
+      setDirectError(err.message || 'Invalid Access PIN. Team not found.');
+    } finally {
+      setDirectLoading(false);
     }
   };
 
@@ -107,77 +136,111 @@ export function Login({ onSuccess }) {
                 FRANCHISE SELECTION
               </span>
               <p className="text-xs text-muted font-inter">
-                Select your team franchise to enter passkey
+                Select your team franchise or enter your owner access PIN
               </p>
             </div>
             <span className="text-[10px] font-rajdhani font-bold px-2.5 py-0.5 rounded-full bg-surface-700/50 text-slate-400 border border-surface-500/40 uppercase self-start sm:self-auto">
-              4 Active Teams
+              {teams.length} {teams.length === 1 ? 'Registered Team' : 'Registered Teams'}
             </span>
           </div>
 
-          {/* Expansive 2x2 Team Grid (1-column on mobile, 2-column on sm+) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {TEAMS_CONFIG.map((t) => {
-              const isPending = t.isPending === true;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => !isPending && handleSelectRole(t.id)}
-                  disabled={isPending}
-                  className={`relative overflow-hidden group p-4 sm:p-5 rounded-2xl border min-h-[110px] sm:min-h-[130px]
-                             transition-all duration-300 text-left flex flex-col justify-between
-                             ${isPending ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:scale-[1.02] active:scale-[0.98] cursor-pointer hover:shadow-2xl'}
-                             ${t.color}`}
-                >
-                  {/* ── Background Watermark Logo (15% - 25% Opacity) ──── */}
-                  <img
-                    src={t.logo}
-                    alt=""
-                    aria-hidden="true"
-                    onError={(e) => {
-                      if (t.fallbackLogo && e.currentTarget.src !== t.fallbackLogo) {
-                        e.currentTarget.src = t.fallbackLogo;
-                      }
-                    }}
-                    className="absolute right-0 bottom-0 w-28 h-28 sm:w-36 sm:h-36 object-cover opacity-15 pointer-events-none z-0 mix-blend-screen transition-transform duration-500 group-hover:scale-115 group-hover:opacity-25 translate-x-3 translate-y-3"
-                  />
+          {/* Quick Direct Owner PIN Input */}
+          <form onSubmit={handleDirectPinSubmit} className="p-3.5 sm:p-4 rounded-2xl bg-surface-800/80 border border-fire-500/20 backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[11px] font-rajdhani font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <span>🔑</span> QUICK OWNER LOGIN WITH ACCESS PIN
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={directPin}
+                onChange={(e) => {
+                  setDirectPin(e.target.value);
+                  if (directError) setDirectError('');
+                }}
+                placeholder="Enter 4-6 digit owner PIN..."
+                className="flex-1 px-3 py-2.5 rounded-xl bg-black/60 border border-white/10 text-white font-rajdhani font-bold text-sm tracking-wider focus:outline-none focus:border-amber-400"
+              />
+              <button
+                type="submit"
+                disabled={directLoading || !directPin.trim()}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-fire-600 to-amber-600 hover:from-fire-500 hover:to-amber-500 text-white text-xs font-rajdhani font-black uppercase tracking-wider disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all shadow-md"
+              >
+                {directLoading ? 'CHECKING…' : 'LOGIN'}
+              </button>
+            </div>
+            {directError && (
+              <p className="text-red-400 text-[11px] font-inter mt-2 font-medium">✕ {directError}</p>
+            )}
+          </form>
 
-                  {/* ── Top Row: Mascot Emblem Thumbnail & Short code ─── */}
-                  <div className="relative z-10 flex items-center justify-between gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-lg group-hover:border-white/50 transition-colors">
-                      <img
-                        src={t.logo}
-                        alt={t.name}
-                        className="w-full h-full object-cover rounded-full"
-                        onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-rajdhani font-black px-2 py-0.5 rounded-md bg-black/50 border border-white/10 text-slate-300 tracking-wider">
-                      {t.shortName || 'FF'}
-                    </span>
-                  </div>
-
-                  {/* ── Bottom Row: Team Name & Owner ─────────────────── */}
-                  <div className="relative z-10 mt-3">
-                    <h3 className="font-rajdhani font-black text-base sm:text-lg tracking-wider uppercase text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover:text-amber-300 transition-colors">
-                      {t.name}
-                    </h3>
-                    <div className="flex items-center justify-between gap-2 mt-1">
-                      <p className="text-[11px] text-slate-300 font-inter truncate">
-                        {isPending ? '🔒 Inactive' : `Owner: ${t.owner}`}
-                      </p>
-                      <span className="text-[10px] font-rajdhani font-bold text-gold-400/90 whitespace-nowrap">
-                        ₣40,000 FC
+          {/* Dynamic Teams Grid */}
+          {teamsLoading ? (
+            <div className="p-8 text-center text-muted font-rajdhani font-bold tracking-widest animate-pulse">
+              LOADING TEAMS…
+            </div>
+          ) : teams.length === 0 ? (
+            <div className="p-6 rounded-2xl bg-surface-800/40 border border-dashed border-white/10 text-center">
+              <p className="text-xs font-rajdhani font-bold text-slate-400 uppercase tracking-wider">
+                No active teams registered in database yet.
+              </p>
+              <p className="text-[11px] text-muted font-inter mt-1">
+                Log in as Host Master Admin below to register teams, or enter your owner Access PIN above.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {teams.map((t) => {
+                const isPending = t.isPending === true;
+                const startingPurse = t.budget ?? t.fire_coin_balance ?? 40000;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => !isPending && handleSelectRole(t.id)}
+                    disabled={isPending}
+                    className={`relative overflow-hidden group p-4 sm:p-5 rounded-2xl border min-h-[110px] sm:min-h-[130px]
+                               transition-all duration-300 text-left flex flex-col justify-between
+                               ${isPending ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:scale-[1.02] active:scale-[0.98] cursor-pointer hover:shadow-2xl'}
+                               ${t.color}`}
+                  >
+                    {/* Mascot Emblem Thumbnail & Short Code */}
+                    <div className="relative z-10 flex items-center justify-between gap-3">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-lg group-hover:border-white/50 transition-colors">
+                        <img
+                          src={t.logo || getTeamLogo(t.id)}
+                          alt={t.name || t.team_name}
+                          className="w-full h-full object-cover rounded-full"
+                          onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-rajdhani font-black px-2 py-0.5 rounded-md bg-black/50 border border-white/10 text-slate-300 tracking-wider">
+                        {t.id.slice(0, 5).toUpperCase()}
                       </span>
                     </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
 
-          {/* Prominent Host / Admin Access Button */}
+                    {/* Team Name & Owner */}
+                    <div className="relative z-10 mt-3">
+                      <h3 className="font-rajdhani font-black text-base sm:text-lg tracking-wider uppercase text-white leading-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] group-hover:text-amber-300 transition-colors">
+                        {t.team_name || t.name}
+                      </h3>
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <p className="text-[11px] text-slate-300 font-inter truncate">
+                          Owner: {t.owner_name || t.owner || 'Pending'}
+                        </p>
+                        <span className="text-[10px] font-rajdhani font-bold text-gold-400/90 whitespace-nowrap">
+                          ₣{startingPurse.toLocaleString()} FC
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Master Admin Host Button */}
           <div className="pt-4 border-t border-surface-600/40">
             <button
               type="button"
@@ -214,7 +277,7 @@ export function Login({ onSuccess }) {
         </div>
       ) : (
         /* ===================================================================== */
-        /* PHASE 2: PASSWORD ENTRY SCREEN (selectedRole !== null)                */
+        /* PHASE 2: PASSWORD / ACCESS PIN ENTRY SCREEN (selectedRole !== null)   */
         /* ===================================================================== */
         <div className="space-y-6 animate-slide-up">
           {/* Top Bar with Back Button */}
@@ -240,8 +303,8 @@ export function Login({ onSuccess }) {
                 <span className="text-2xl">👑</span>
               ) : (
                 <img
-                  src={currentTeam?.logo}
-                  alt={currentTeam?.name}
+                  src={currentTeam?.logo || getTeamLogo(currentTeam?.id)}
+                  alt={currentTeam?.team_name || currentTeam?.name}
                   className="w-full h-full object-cover rounded-full"
                   onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
                 />
@@ -252,22 +315,22 @@ export function Login({ onSuccess }) {
                 {isAdminRole ? 'System Role' : 'Selected Franchise'}
               </span>
               <h3 className="font-rajdhani font-black text-xl text-white uppercase tracking-wide leading-tight">
-                {isAdminRole ? 'Host Master Admin' : currentTeam?.name}
+                {isAdminRole ? 'Host Master Admin' : (currentTeam?.team_name || currentTeam?.name)}
               </h3>
               <p className="text-xs text-slate-400 font-inter mt-0.5">
-                {isAdminRole ? 'Full Auction Floor Control' : `Owner: ${currentTeam?.owner}`}
+                {isAdminRole ? 'Full Auction Floor Control' : `Owner: ${currentTeam?.owner_name || currentTeam?.owner}`}
               </p>
             </div>
           </div>
 
-          {/* Password Form */}
+          {/* Password / Access PIN Form */}
           <form onSubmit={handleAuthenticate} className="space-y-4" noValidate>
             <div>
               <label
                 htmlFor="role-password"
                 className="block text-xs font-rajdhani font-bold tracking-[0.2em] text-slate-300 uppercase mb-2"
               >
-                ENTER SECURITY PASSKEY
+                {isAdminRole ? 'ENTER HOST MASTER PASSWORD' : 'ENTER OWNER ACCESS PIN'}
               </label>
 
               <div className="relative">
@@ -282,7 +345,7 @@ export function Login({ onSuccess }) {
                     setPassword(e.target.value);
                     if (error) setError('');
                   }}
-                  placeholder={isAdminRole ? 'HOST#FF2026-X99' : 'e.g. ALPHA-9082-FF'}
+                  placeholder={isAdminRole ? 'HOST#FF2026-X99' : 'Enter access PIN...'}
                   autoComplete="current-password"
                   autoFocus
                   className="w-full px-4 py-4 pl-12 pr-12 rounded-xl bg-surface-800/90 border border-surface-600/60
@@ -329,7 +392,7 @@ export function Login({ onSuccess }) {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                   </svg>
-                  VERIFYING PASSKEY…
+                  VERIFYING ACCESS PIN…
                 </span>
               ) : (
                 <>

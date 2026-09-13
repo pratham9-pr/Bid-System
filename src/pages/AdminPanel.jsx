@@ -45,7 +45,7 @@ export default function AdminPanel() {
 
   const handleHardReset = async () => {
     const confirmed = window.confirm(
-      '⚠️ WARNING: HARD RESET & PURGE!\n\nThis will:\n1. Delete ALL players from the database\n2. Clear all team rosters & captain assignments\n3. Restore all 4 franchise purses to ₣40,000 FC\n4. Reset global auction state to idle\n\nAre you sure you want to proceed?'
+      '⚠️ WARNING: HARD RESET & PURGE!\n\nThis will:\n1. Delete ALL players from the database\n2. Clear all team rosters & captain assignments\n3. Restore all dynamic team budgets to ₣40,000 FC\n4. Reset global live_auction state to idle\n\nAre you sure you want to proceed?'
     );
     if (!confirmed) return;
 

@@ -239,7 +239,7 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
                 onChange={(e) => {
                   const targetTeamId = e.target.value;
                   if (!targetTeamId) return;
-                  const teamList = teams.length > 0 ? teams : TEAMS_CONFIG;
+                  const teamList = teams || [];
                   const team = teamList.find((t) => t.id === targetTeamId);
                   const targetTeamName = getTeamDisplayName(targetTeamId, team?.team_name || team?.name);
                   run('quickSell', () =>
@@ -260,7 +260,7 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
                 <option value="" disabled className="bg-surface-900 text-muted">
                   Sell ▾
                 </option>
-                {(teams.length > 0 ? teams : TEAMS_CONFIG)
+                {(teams || [])
                   .filter((t) => t.isPending !== true)
                   .map((t) => (
                     <option key={t.id} value={t.id} className="bg-surface-900 text-white font-rajdhani font-bold">

@@ -22,46 +22,36 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
     }
   };
 
-  // Sync from teams or fallback to TEAMS_CONFIG so host can always edit
+  // Sync from dynamic teams
   useEffect(() => {
     // If user is currently editing, do not clobber their unsaved inputs
     if (isDirtyRef.current) return;
 
     const matrix = {};
-    TEAMS_CONFIG.forEach((config) => {
-      const liveTeam = (teams || []).find((t) => {
-        const tId = String(t.id || '').toLowerCase().trim();
-        const tName = String(t.team_name || t.name || '').toLowerCase().trim();
-        return (
-          tId === config.id ||
-          config.aliases?.includes(tId) ||
-          tName === config.name.toLowerCase() ||
-          config.aliases?.some((a) => tName.includes(a))
-        );
-      });
-
-      const liveId = config.id;
-      const rawDiff = liveTeam?.score_diff ?? liveTeam?.diff ?? config.defaultStats?.diff ?? 0;
+    (teams || []).forEach((liveTeam) => {
+      const liveId = liveTeam.id;
+      const rawDiff = liveTeam?.score_diff ?? liveTeam?.diff ?? 0;
       const numDiff = typeof rawDiff === 'string' ? parseInt(rawDiff.replace('+', ''), 10) || 0 : (Number(rawDiff) || 0);
 
-      const defaultStats = config.defaultStats || { wins: 0, losses: 0, diff: 0, pts: 0 };
-      const wins = typeof liveTeam?.wins === 'number' ? liveTeam.wins : defaultStats.wins;
-      const losses = typeof liveTeam?.losses === 'number' ? liveTeam.losses : defaultStats.losses;
+      const wins = typeof liveTeam?.wins === 'number' ? liveTeam.wins : 0;
+      const losses = typeof liveTeam?.losses === 'number' ? liveTeam.losses : 0;
       const points = typeof liveTeam?.points === 'number'
         ? liveTeam.points
-        : (typeof liveTeam?.pts === 'number' ? liveTeam.pts : defaultStats.pts);
+        : (typeof liveTeam?.pts === 'number' ? liveTeam.pts : 0);
+
+      const bal = liveTeam?.budget ?? liveTeam?.fire_coin_balance ?? 40000;
 
       matrix[liveId] = {
         id: liveId,
-        name: getTeamDisplayName(liveId, liveTeam?.team_name || liveTeam?.name || config.name),
-        owner: getTeamOwner(liveId, liveTeam?.owner_name || liveTeam?.owner || config.owner),
-        logo: getTeamLogo(liveId),
+        name: getTeamDisplayName(liveId, liveTeam?.team_name || liveTeam?.name),
+        owner: getTeamOwner(liveId, liveTeam?.owner_name || liveTeam?.owner),
+        logo: liveTeam?.logo || getTeamLogo(liveId),
         matches_played: Number(liveTeam?.matches_played ?? (wins + losses)),
         wins: Number(wins),
         losses: Number(losses),
         score_diff: numDiff,
         points: Number(points),
-        balance: liveTeam?.fire_coin_balance ?? 40000,
+        balance: bal,
       };
     });
 
@@ -241,22 +231,22 @@ export function StandingsControlMatrix({ teams = [], onRefresh }) {
     setSaving(true);
 
     try {
-      const resetEntries = TEAMS_CONFIG.map((config) => ({
-        id: config.id,
-        team_name: config.name,
-        owner_name: config.owner,
-        owner_email: `${config.id}@freefire.auction`,
+      const resetEntries = (teams || []).map((t) => ({
+        id: t.id,
         matches_played: 0,
         wins: 0,
         losses: 0,
         score_diff: 0,
         points: 0,
+        budget: 40000,
         fire_coin_balance: 40000,
       }));
 
-      await supabase
-        .from('teams')
-        .upsert(resetEntries, { onConflict: 'id' });
+      if (resetEntries.length > 0) {
+        await supabase
+          .from('teams')
+          .upsert(resetEntries, { onConflict: 'id' });
+      }
 
       setSaving(false);
       isDirtyRef.current = false;

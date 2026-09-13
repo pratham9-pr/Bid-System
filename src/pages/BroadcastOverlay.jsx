@@ -249,6 +249,9 @@ export default function BroadcastOverlay() {
   }, [auctionState?.broadcast_view]);
 
   const isSold = activePlayer?.status === 'sold';
+  const halfCount = Math.ceil((teams || []).length / 2);
+  const leftTeams = (teams || []).slice(0, halfCount);
+  const rightTeams = (teams || []).slice(halfCount);
 
   return (
     <div
@@ -361,10 +364,11 @@ export default function BroadcastOverlay() {
         </div>
       ) : (
         <div className="flex-1 w-full p-2 sm:p-3 lg:p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-3.5 min-h-0 overflow-hidden relative z-10">
-          {/* ── LEFT SIDEBAR (25% Width / Col 3): POWER HAWKS & ABYSSAL EBON ── */}
+          {/* ── LEFT SIDEBAR (25% Width / Col 3): Dynamic Teams ── */}
           <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
-            <FranchiseSidebarCard teamId="alpha_wolves" teams={teams} players={players} />
-            <FranchiseSidebarCard teamId="gamma_reapers" teams={teams} players={players} />
+            {leftTeams.map((t) => (
+              <FranchiseSidebarCard key={t.id} teamId={t.id} teams={teams} players={players} />
+            ))}
           </aside>
 
           {/* ── CENTER STAGE (50% Width / Col 6): FULL-BLEED ACTIVE PLAYER CARD & HUD ── */}
@@ -452,10 +456,11 @@ export default function BroadcastOverlay() {
             </div>
           </main>
 
-          {/* ── RIGHT SIDEBAR (25% Width / Col 3): TEAM VORTEX & RX KUDLA ───── */}
+          {/* ── RIGHT SIDEBAR (25% Width / Col 3): Dynamic Teams ───── */}
           <aside className="lg:col-span-3 w-full flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
-            <FranchiseSidebarCard teamId="beta_strikers" teams={teams} players={players} />
-            <FranchiseSidebarCard teamId="delta_phantoms" teams={teams} players={players} />
+            {rightTeams.map((t) => (
+              <FranchiseSidebarCard key={t.id} teamId={t.id} teams={teams} players={players} />
+            ))}
           </aside>
         </div>
       )}
