@@ -1,9 +1,12 @@
 import { supabase } from '../config/supabase';
 import { getTeamDisplayName } from '../config/teamsConfig';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
+
+const { currencySymbol: CS, currencyName: CN } = PLATFORM_CONFIG;
 
 // ─── GLOBAL AUCTION CONSTRAINTS ───────────────────────────────────────────────
-export const MAX_BID_LIMIT       = 30000; // 30,000 FC global auto-sell cap (hard ceiling)
-export const DEFAULT_TEAM_PURSE  = 40000; // 40,000 FC starting team purse
+export const MAX_BID_LIMIT       = 30000; // Global auto-sell cap (hard ceiling)
+export const DEFAULT_TEAM_PURSE  = 40000; // Default starting team purse
 export const MIN_BASE_PRICE      = 3000;  // Lowest possible player base price — used in max-bid formula
 
 /**
@@ -13,7 +16,7 @@ export const MIN_BASE_PRICE      = 3000;  // Lowest possible player base price �
  *
  * Formula: remainingPurse - (MIN_BASE_PRICE × (remainingEmptySlots - 1))
  *
- * @param {number} remainingPurse     - Team's current fire_coin_balance
+ * @param {number} remainingPurse      - Team's current purse balance
  * @param {number} remainingEmptySlots - How many auction draft slots are still open (1–3)
  * @returns {number} Maximum allowed bid amount (floored at 0)
  */
@@ -137,7 +140,7 @@ export async function placeBid(playerId, teamId, bidAmount) {
 
     const teamBalance = typeof teamData.fire_coin_balance === 'number' ? teamData.fire_coin_balance : 40000;
     if (teamBalance < numericBid) {
-      return { success: false, error: `Insufficient Fire Coins! Balance: ₣${teamBalance.toLocaleString()}` };
+      return { success: false, error: `Insufficient ${CN}! Balance: ${CS}${teamBalance.toLocaleString()}` };
     }
 
     const teamDisplayName = getTeamDisplayName(cleanTeamId, teamData.team_name || teamData.name);
@@ -176,7 +179,7 @@ export async function placeBid(playerId, teamId, bidAmount) {
       return {
         success:   true,
         auto_sold: true,
-        message:   `Max limit reached! Player auto-sold to ${teamDisplayName} for ₣${numericBid.toLocaleString()}`,
+        message:   `Max limit reached! Player auto-sold to ${teamDisplayName} for ${CS}${numericBid.toLocaleString()}`,
       };
     } else {
       // Normal bid increment
@@ -839,8 +842,8 @@ export async function appointTeamCaptain(playerId, teamId, teamName) {
 
       if (priorPlayers && priorPlayers.length > 0) {
         for (const prev of priorPlayers) {
-          // Release prior captains (0-bid / IGL)
-          if (prev.is_captain || prev.role === 'IGL' || prev.current_bid === 0) {
+          // Release prior captains — identified strictly by is_captain flag or zero-bid status
+          if (prev.is_captain || prev.current_bid === 0) {
             await safeUpdatePlayer(prev.id, {
               is_captain:                  false,
               status:                      'upcoming',
@@ -856,10 +859,11 @@ export async function appointTeamCaptain(playerId, teamId, teamName) {
       console.warn('Prior captain reset warning:', e);
     }
 
-    // 2. Appoint new captain: role='IGL', is_captain=true, status='sold', locked into team
+    // 2. Appoint new captain: is_captain=true, status='sold', locked into team.
+    //    Role is NOT overridden — it is preserved from the player's existing DB record.
+    //    This keeps sport-agnostic role data intact (Batsman, Raider, Forward, etc.).
     const appointPayload = {
       is_captain:                  true,
-      role:                        'IGL',
       status:                      'sold',
       current_highest_bidder:      tId,
       current_highest_bidder_name: tName,
@@ -972,7 +976,7 @@ export async function seedDatabase() {
       console.warn('RPC seed warning:', e);
     }
 
-    // Direct guarantee: Reset all team balances to 40,000 FC, assign permanent captains
+    // Direct guarantee: Reset all team balances to starting purse, assign permanent captains
     const resetRes = await resetAllRostersAndCaptains();
     if (!resetRes.success && !rpcRes) {
       return { success: false, error: resetRes.error };
@@ -980,7 +984,7 @@ export async function seedDatabase() {
 
     return {
       success: true,
-      message: rpcRes?.message || 'All teams successfully reset to ₣40,000 FC starting purse!',
+      message: rpcRes?.message || `All teams successfully reset to ${CS}${DEFAULT_TEAM_PURSE.toLocaleString()} starting purse!`,
     };
   } catch (err) {
     return { success: false, error: err.message };
@@ -988,7 +992,7 @@ export async function seedDatabase() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  HARD RESET & PURGE (Deletes all players, clears state, resets all 4 purses to 40,000)
+//  HARD RESET & PURGE (Deletes all players, clears state, restores all purses)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function hardResetDatabase() {
   try {
@@ -1041,7 +1045,7 @@ export async function hardResetDatabase() {
 
     return {
       success: true,
-      message: 'Hard reset complete! All players purged and all 4 franchise purses restored to ₣40,000 FC.',
+      message: `Hard reset complete! All players purged and all franchise purses restored to ${CS}${DEFAULT_TEAM_PURSE.toLocaleString()}.`,
     };
   } catch (err) {
     console.error('Hard reset error:', err);

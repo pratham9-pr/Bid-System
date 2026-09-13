@@ -14,6 +14,8 @@ import { seedDatabase, hardResetDatabase, revealPlayer, hidePlayer, startBidding
 import { PLATFORM_CONFIG } from '../config/platformConfig';
 import { useTournamentContext } from '../context/TournamentContext';
 
+const { currencySymbol: CS } = PLATFORM_CONFIG;
+
 export default function AdminPanel() {
   const navigate  = useNavigate();
   const { firebaseUser, signOut, isAdmin } = useAuth();
@@ -55,7 +57,7 @@ export default function AdminPanel() {
 
   const handleHardReset = async () => {
     const confirmed = window.confirm(
-      '⚠️ WARNING: HARD RESET & PURGE!\n\nThis will:\n1. Delete ALL players from the database\n2. Clear all team rosters & captain assignments\n3. Restore all 4 franchise purses to ₣40,000 FC\n4. Reset global auction state to idle\n\nAre you sure you want to proceed?'
+      '⚠️ WARNING: HARD RESET & PURGE!\n\nThis will:\n1. Delete ALL players from the database\n2. Clear all team rosters & captain assignments\n3. Restore all franchise purses to starting values\n4. Reset global auction state to idle\n\nAre you sure you want to proceed?'
     );
     if (!confirmed) return;
 
@@ -157,7 +159,7 @@ export default function AdminPanel() {
                 onClick={handleHardReset}
                 disabled={resetting || seeding}
                 className="text-xs px-3 py-2 rounded-lg font-rajdhani font-bold uppercase tracking-wider bg-red-950/40 text-red-400 border border-red-500/30 hover:bg-red-900/50 hover:border-red-500/60 hover:text-red-300 transition-all duration-150 disabled:opacity-40"
-                title="Completely delete all players, clear all rosters & reset all 4 franchise purses to 40,000 FC"
+                title="Completely delete all players, clear all rosters & restore all franchise purses to starting values"
               >
                 {resetting ? 'Purging…' : '🧨 Hard Reset'}
               </button>
@@ -211,6 +213,17 @@ export default function AdminPanel() {
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-5">
+        {!tLoading && (!teams || teams.length === 0) && (
+          <div className="max-w-4xl mx-auto mb-5 p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-300 flex items-center gap-3 shadow-lg">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="font-rajdhani font-black text-sm uppercase tracking-wider">Standby: No Franchises Active</p>
+              <p className="text-xs font-inter text-amber-300/80">
+                Franchise teams array is strictly empty. Roster and bidding matrix panels are in standby mode until teams are added.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Players tab */}
         {activeTab === 'Players' && (
@@ -389,8 +402,8 @@ export default function AdminPanel() {
                       </p>
                       <p className="text-[9px] text-gold-400 font-inter mt-0.5">
                         {activePlayer.current_bid > 0
-                          ? `Current bid: ₣${activePlayer.current_bid.toLocaleString()}`
-                          : `Base price: ₣${(activePlayer.base_price || 0).toLocaleString()}`}
+                          ? `Current bid: ${CS}${activePlayer.current_bid.toLocaleString()}`
+                          : `Base price: ${CS}${(activePlayer.base_price || 0).toLocaleString()}`}
                       </p>
                     </div>
                   </div>
@@ -446,7 +459,7 @@ export default function AdminPanel() {
                       if (result.success) {
                         setSellMsg({
                           ok: true,
-                          text: `✓ ${result.playerName} sold to ${result.teamName} for ₣${result.sellPrice.toLocaleString()} FC`,
+                          text: `✓ ${result.playerName} sold to ${result.teamName} for ${CS}${result.sellPrice.toLocaleString()}`,
                         });
                         setSellTeamId('');
                         setTimeout(() => setSellMsg(null), 5000);
@@ -526,7 +539,7 @@ export default function AdminPanel() {
                             {cap.in_game_name || cap.name}
                           </span>
                           <span className="px-1.5 py-0.5 rounded bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[8px] font-rajdhani font-black uppercase tracking-wider">
-                            👑 CAPTAIN · IGL
+                            👑 CAPTAIN
                           </span>
                         </div>
                         <div className="text-[9px] text-amber-400/70 font-inter">

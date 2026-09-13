@@ -118,7 +118,7 @@ export default function AuctionRoom() {
           </span>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg
                           bg-surface-700 border border-surface-500/50">
-            <span className="text-gold-400 font-rajdhani font-bold text-sm">₣</span>
+            <span className="text-gold-400 font-rajdhani font-bold text-sm">{PLATFORM_CONFIG.currencySymbol}</span>
             <span className="font-rajdhani font-bold text-sm text-white tabular-nums">
               {(displayTeam?.fire_coin_balance ?? 0).toLocaleString()}
             </span>

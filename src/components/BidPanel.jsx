@@ -3,6 +3,9 @@ import { placeBid, MAX_BID_LIMIT, MIN_BASE_PRICE, computeMaxAllowedBid } from '.
 import { useAllPlayers } from '../hooks/useAllPlayers';
 import { getTeamFullRoster } from '../config/franchiseCaptains';
 import { getTeamDisplayName, getTeamLogo } from '../config/teamsConfig';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
+
+const { currencySymbol: CS, currencyName: CN } = PLATFORM_CONFIG;
 
 // ─── SVG Ring Constants ──────────────────────────────────────────────────────
 const RING_SIZE       = 72;   // px — total SVG canvas size
@@ -134,8 +137,8 @@ function CooldownRingButton({ onBid, disabled, isSold, isPaused, isInsufficient 
           </>
         ) : isInsufficient ? (
           <>
-            <span className="block text-[9px]">₣✕</span>
-            <span className="block text-[8px] leading-none">LOW FC</span>
+            <span className="block text-[9px]">{CS}✕</span>
+            <span className="block text-[8px] leading-none">LOW BAL</span>
           </>
         ) : (
           <span className="block">BID</span>
@@ -180,7 +183,7 @@ function MaxBidMeter({ teamBalance, remainingSlots, currentBid }) {
         </div>
         <span className={`font-rajdhani font-black text-base tabular-nums
           ${isDanger ? 'text-red-400' : isWarning ? 'text-amber-300' : 'text-white'}`}>
-          ₣{maxAllowed.toLocaleString()}
+          {CS}{maxAllowed.toLocaleString()}
         </span>
       </div>
 
@@ -196,11 +199,11 @@ function MaxBidMeter({ teamBalance, remainingSlots, currentBid }) {
       {/* Breakdown */}
       <div className="flex items-center justify-between text-[9px] font-inter text-muted gap-2">
         <span>
-          ₣{teamBalance.toLocaleString()} purse
-          {reserved > 0 && <span className="text-amber-500/70"> − ₣{reserved.toLocaleString()} reserved</span>}
+          {CS}{teamBalance.toLocaleString()} purse
+          {reserved > 0 && <span className="text-amber-500/70"> − {CS}{reserved.toLocaleString()} reserved</span>}
         </span>
         <span className="text-[9px] text-muted">
-          Formula: purse − (₣{MIN_BASE_PRICE.toLocaleString()} × {Math.max(0, (remainingSlots || 1) - 1)} slots)
+          Formula: purse − ({CS}{MIN_BASE_PRICE.toLocaleString()} × {Math.max(0, (remainingSlots || 1) - 1)} slots)
         </span>
       </div>
     </div>
@@ -280,25 +283,25 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
     if (amount <= Number(activePlayer.current_bid ?? 0) && activePlayer.current_highest_bidder) {
       onNotify?.({
         type: 'error',
-        message: `Bid must exceed current bid of ₣${Number(activePlayer.current_bid ?? 0).toLocaleString()}`,
+        message: `Bid must exceed current bid of ${CS}${Number(activePlayer.current_bid ?? 0).toLocaleString()}`,
       });
       return;
     }
     if (amount < Number(activePlayer.base_price ?? 0)) {
       onNotify?.({
         type: 'error',
-        message: `Bid cannot be lower than base price of ₣${Number(activePlayer.base_price ?? 0).toLocaleString()}`,
+        message: `Bid cannot be lower than base price of ${CS}${Number(activePlayer.base_price ?? 0).toLocaleString()}`,
       });
       return;
     }
     if (amount > teamBalance) {
-      onNotify?.({ type: 'error', message: `Insufficient Fire Coins! Balance: ₣${teamBalance.toLocaleString()}` });
+      onNotify?.({ type: 'error', message: `Insufficient ${CN}! Balance: ${CS}${teamBalance.toLocaleString()}` });
       return;
     }
     if (amount > effectiveMax) {
       onNotify?.({
         type: 'error',
-        message: `Max allowed bid is ₣${effectiveMax.toLocaleString()} FC — you need to keep ₣${MIN_BASE_PRICE.toLocaleString()} reserved for each remaining open slot.`,
+        message: `Max allowed bid is ${CS}${effectiveMax.toLocaleString()} — you need to keep ${CS}${MIN_BASE_PRICE.toLocaleString()} reserved for each remaining open slot.`,
       });
       return;
     }
@@ -311,9 +314,9 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
 
       if (result.success) {
         if (result.auto_sold) {
-          onNotify?.({ type: 'success', message: `🏆 MAX CAP REACHED! Player auto-sold at ₣${amount.toLocaleString()} FC!` });
+          onNotify?.({ type: 'success', message: `🏆 MAX CAP REACHED! Player auto-sold at ${CS}${amount.toLocaleString()}!` });
         } else {
-          onNotify?.({ type: 'success', message: `Bid of ₣${amount.toLocaleString()} placed!` });
+          onNotify?.({ type: 'success', message: `Bid of ${CS}${amount.toLocaleString()} placed!` });
         }
       } else {
         const msg = result.error || 'Bid failed.';
@@ -370,7 +373,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
           </span>
         ) : (
           <span className="text-[10px] font-rajdhani font-bold uppercase tracking-wider text-slate-400">
-            ₣{effectiveMax.toLocaleString()} Max
+            {CS}{effectiveMax.toLocaleString()} Max
           </span>
         )}
       </div>
@@ -399,12 +402,9 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
 
           {/* Amount Display */}
           <div className="flex items-baseline gap-2 mb-3">
-            <span className={`font-rajdhani font-black text-2xl ${isSold ? 'text-gold-400' : 'text-fire-400'}`}>₣</span>
+            <span className={`font-rajdhani font-black text-2xl ${isSold ? 'text-gold-400' : 'text-fire-400'}`}>{CS}</span>
             <span className={`font-rajdhani font-black text-4xl tracking-tight tabular-nums ${isSold ? 'text-gradient-gold' : 'text-gradient-fire'}`}>
               {Number(activePlayer.current_bid ?? activePlayer.base_price ?? 0).toLocaleString()}
-            </span>
-            <span className="text-xs text-slate-400 font-rajdhani font-bold ml-auto uppercase tracking-wider">
-              FC
             </span>
           </div>
 
@@ -435,7 +435,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
             {/* Base price reference if no bids */}
             {!activePlayer.current_highest_bidder && (
               <span className="text-[10px] text-amber-400/90 font-rajdhani font-bold whitespace-nowrap bg-amber-500/10 px-2 py-1 rounded-md border border-amber-500/20">
-                Base: ₣{Number(activePlayer.base_price ?? 0).toLocaleString()}
+                Base: {CS}{Number(activePlayer.base_price ?? 0).toLocaleString()}
               </span>
             )}
           </div>
@@ -531,10 +531,10 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
           <span className="text-sm">⚠️</span>
           <div className="flex-1">
             <p className="text-xs font-rajdhani font-bold uppercase tracking-wide">
-              Insufficient Fire Coins
+              Insufficient Balance
             </p>
             <p className="text-[9px] text-red-400/80 font-inter mt-0.5">
-              Your balance (₣{teamBalance.toLocaleString()}) is lower than the required bid.
+              Your balance ({CS}{teamBalance.toLocaleString()}) is lower than the required bid.
             </p>
           </div>
         </div>
@@ -582,7 +582,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
         {/* Input */}
         <div className="flex-1 relative">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-rajdhani font-bold text-xl text-gold-500 pointer-events-none select-none">
-            ₣
+            {CS}
           </span>
           <input
             id="bid-amount-input"
@@ -644,7 +644,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
               : isFloorLocked
                 ? 'Bidding floor is locked — the host will open bids momentarily.'
                 : activePlayer && biddingOpen
-                  ? `Min bid: ₣${(Number(activePlayer.current_bid ?? 0) + 1).toLocaleString()} · Your max: ₣${effectiveMax.toLocaleString()} FC`
+                  ? `Min bid: ${CS}${(Number(activePlayer.current_bid ?? 0) + 1).toLocaleString()} · Your max: ${CS}${effectiveMax.toLocaleString()}`
                   : 'Waiting for the auctioneer to start…'}
       </p>
 
@@ -652,7 +652,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
       <div className="flex items-center gap-2 px-3 py-2 bg-surface-700/40 rounded-lg border border-surface-600/30">
         <div className="w-1.5 h-1.5 rounded-full bg-fire-500/60 animate-pulse flex-shrink-0" />
         <p className="text-[10px] text-muted font-inter">
-          Purse: ₣{teamBalance.toLocaleString()} FC
+          Purse: {CS}{teamBalance.toLocaleString()}
           {remainingSlots > 0 && ` · ${remainingSlots} draft slot${remainingSlots !== 1 ? 's' : ''} remaining`}
           {' · 3s server cooldown between bids'}
         </p>

@@ -21,4 +21,19 @@ export const PLATFORM_CONFIG = {
 
   /** Current season / year label */
   year: '2026',
+
+  /**
+   * Currency symbol displayed across all bid, purse, and balance UI surfaces.
+   * Change to '$', '€', '₹', or any token symbol ('Pts', 'Cr') to rebrand for
+   * a different sport or region without touching individual components.
+   *
+   * Default: '₹' (Indian Rupee — works for Cricket, Football, Kabaddi, etc.)
+   */
+  currencySymbol: '₹',
+
+  /**
+   * Human-readable name for the in-game currency unit.
+   * Shown in longer labels like "My Balance", error messages, and reset dialogs.
+   */
+  currencyName: 'Credits',
 };

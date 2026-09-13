@@ -11,6 +11,9 @@ import {
 } from '../services/auctionService';
 import { RoleBadge } from './RoleBadge';
 import { getTeamDisplayName } from '../config/teamsConfig';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
+
+const { currencySymbol: CS } = PLATFORM_CONFIG;
 
 // ─── Status dot ───────────────────────────────────────────────────────────────
 const StatusDot = ({ status, isCaptain }) => {
@@ -130,7 +133,7 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
               {isCaptain && (
                 <span className="px-2 py-0.5 rounded bg-gradient-to-r from-amber-500 to-orange-500 text-black text-[9px] font-rajdhani font-black uppercase tracking-wider flex items-center gap-1 shadow-sm">
                   <span>👑</span>
-                  <span>CAPTAIN (IGL)</span>
+                <span>CAPTAIN</span>
                 </span>
               )}
 
@@ -157,16 +160,16 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
                 </span>
               )}
 
-              {/* Role badge (Defaulted to IGL if Captain) */}
-              <RoleBadge role={isCaptain ? 'IGL' : player.role || 'Rusher'} size="xs" />
+              {/* Role badge — rendered from DB value; no sport-specific fallback */}
+              <RoleBadge role={isCaptain ? (player.role || 'Captain') : (player.role || null)} size="xs" />
             </div>
 
             <div className="flex gap-3 mt-0.5">
               <span className="text-[10px] text-muted font-inter">
-                Base ₣{player.base_price?.toLocaleString()}
+                Base {CS}{player.base_price?.toLocaleString()}
               </span>
               <span className="text-[10px] text-muted font-inter">
-                Max ₣{player.max_limit?.toLocaleString()}
+                Max {CS}{player.max_limit?.toLocaleString()}
               </span>
             </div>
 
@@ -176,7 +179,7 @@ export function PlayerControlCard({ player, isActive, isRevealed, auctionPaused,
                 {isCaptain ? (
                   <span className="text-amber-400 font-rajdhani font-bold"> · 🔒 Locked Captain</span>
                 ) : (
-                  <span className="text-muted"> @ ₣{player.current_bid?.toLocaleString()}</span>
+                  <span className="text-muted"> @ {CS}{player.current_bid?.toLocaleString()}</span>
                 )}
               </div>
             )}

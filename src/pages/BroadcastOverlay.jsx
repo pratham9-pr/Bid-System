@@ -10,6 +10,9 @@ import { getTeamFullRoster } from '../config/franchiseCaptains';
 import { MAX_BID_LIMIT } from '../services/auctionService';
 import { useTournament } from '../hooks/useTournament';
 import { TournamentContext, useTournamentContext } from '../context/TournamentContext';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
+
+const { currencySymbol: CS } = PLATFORM_CONFIG;
 
 // ─── SOLD OUT Stamp Component ────────────────────────────────────────────────
 function SoldOutStamp({ winnerName, winningBid }) {
@@ -60,7 +63,7 @@ function SoldOutStamp({ winnerName, winningBid }) {
           </span>
           <span className="text-slate-400 text-xs">•</span>
           <span className="font-rajdhani font-black text-sm text-fire-400 tabular-nums">
-            ₣{(winningBid ?? 0).toLocaleString()}
+            {CS}{(winningBid ?? 0).toLocaleString()}
           </span>
         </motion.div>
       </div>
@@ -120,7 +123,7 @@ function FranchiseSidebarCard({ team, players }) {
               Balance
             </span>
             <span className="font-rajdhani font-black text-xs sm:text-sm text-gold-400 tabular-nums">
-              ₣{balance.toLocaleString()}
+              {CS}{balance.toLocaleString()}
             </span>
           </div>
         </div>
@@ -181,11 +184,11 @@ function FranchiseSidebarCard({ team, players }) {
               <div className="flex items-center gap-1 flex-shrink-0">
                 {isCaptain ? (
                   <span className="px-1.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-black font-rajdhani font-black text-[8px] uppercase tracking-wider">
-                    👑 IGL
+                    👑 {player.role || 'Captain'}
                   </span>
                 ) : (
                   <span className="font-rajdhani font-bold text-[11px] text-gold-400 tabular-nums">
-                    ₣{(player.current_bid ?? player.sold_price ?? 0).toLocaleString()}
+                    {CS}{(player.current_bid ?? player.sold_price ?? 0).toLocaleString()}
                   </span>
                 )}
               </div>
@@ -245,7 +248,14 @@ export default function BroadcastOverlay() {
   const isSold = activePlayer?.status === 'sold';
 
   if (!teams || teams.length === 0) {
-    return <div className="bg-black h-screen w-screen"></div>;
+    return (
+      <div className="bg-black h-screen w-screen flex flex-col items-center justify-center gap-4">
+        <div className="w-3 h-3 rounded-full bg-white/20 animate-ping" />
+        <p className="text-white/30 text-sm font-rajdhani uppercase tracking-[0.3em]">
+          ⏳ Awaiting Tournament Data…
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -254,7 +264,7 @@ export default function BroadcastOverlay() {
         <div key={team.id} className="p-4 border border-white/20 rounded-lg bg-surface-900/80">
           <h2 className="text-lg font-bold text-amber-400">{team.name || team.team_name}</h2>
           <p className="text-sm text-slate-400">Owner: {team.owner_name || team.owner}</p>
-          <p className="text-sm text-gold-400">Balance: ₣{(team.fire_coin_balance ?? team.purse ?? 0).toLocaleString()}</p>
+          <p className="text-sm text-gold-400">Balance: {CS}{(team.fire_coin_balance ?? team.purse ?? 0).toLocaleString()}</p>
         </div>
       ))}
     </div>

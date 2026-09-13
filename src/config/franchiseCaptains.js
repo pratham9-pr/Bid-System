@@ -1,9 +1,10 @@
 // =============================================================================
 //  FRANCHISE CAPTAINS & ROSTER MANAGEMENT CONFIGURATION
 // =============================================================================
-// Each active team has a 4-player roster capacity and 40,000 FC starting purse.
+// Each active team has a configurable roster capacity and a starting purse.
 // Slot 1: Team Captain (Permanent / Appointed)
-// Slots 2–4: Auction Drafted Players (sold for FC > 0 during live bidding)
+// Slots 2–N: Auction Drafted Players (sold during live bidding)
+// Compatible with Cricket, Football, Kabaddi, BGMI, and any custom sport.
 // =============================================================================
 
 import { TEAMS_CONFIG } from './teamsConfig';
@@ -91,7 +92,9 @@ export function getTeamFullRoster(teamId, allPlayers = []) {
       image_url: dbMatch.image_url || null,
       is_captain: true,
       is_locked: true,
-      role: 'IGL',
+      // Preserve the role from the DB record; fall back to the generic 'Captain' label.
+      // Never assume IGL or any esports-specific role.
+      role: dbMatch.role || 'Captain',
       status: 'captain',
     };
   }

@@ -1,6 +1,9 @@
 import React from 'react';
 import { getTeamDisplayName, getTeamOwner, getTeamLogo, getTeamTheme } from '../config/teamsConfig';
 import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
+
+const { currencySymbol: CS } = PLATFORM_CONFIG;
 
 /**
  * TeamCard component for Host Panel Auction Controls
@@ -52,7 +55,7 @@ export function TeamCard({ team, allPlayers = [], onSelectTeam, isSelected = fal
         <div className="text-right flex-shrink-0">
           <span className="text-[9px] text-muted font-inter uppercase block leading-none">Purse</span>
           <span className="font-rajdhani font-black text-base text-gold-400 tabular-nums">
-            ₣{balance.toLocaleString()}
+            {CS}{balance.toLocaleString()}
           </span>
         </div>
       </div>

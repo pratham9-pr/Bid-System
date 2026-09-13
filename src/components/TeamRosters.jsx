@@ -3,6 +3,9 @@ import { RoleBadge } from './RoleBadge';
 import { getTeamFullRoster, isPlayerAssignedToTeam, MAX_ROSTER_SIZE, MAX_AUCTION_SLOTS } from '../config/franchiseCaptains';
 import { appointTeamCaptain, removePlayerFromRoster, resetAllRostersAndCaptains, DEFAULT_TEAM_PURSE } from '../services/auctionService';
 import { getTeamLogo, getTeamDisplayName, getTeamOwner } from '../config/teamsConfig';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
+
+const { currencySymbol: CS, currencyName: CN } = PLATFORM_CONFIG;
 
 // Team logo helper — uses central config so name/logo changes propagate everywhere
 const getTeamLogoUrl = (teamId) => getTeamLogo(teamId);
@@ -175,9 +178,9 @@ function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamNa
           {player.in_game_name || player.name}
         </span>
 
-        {/* Role badge (Defaulted to IGL for Captains) */}
+        {/* Role badge — rendered from DB value; no sport-specific fallback */}
         <div className="flex justify-center my-0.5">
-          <RoleBadge role={isCaptain ? 'IGL' : player.role || 'Rusher'} size="xs" />
+          <RoleBadge role={isCaptain ? (player.role || 'Captain') : (player.role || null)} size="xs" />
         </div>
 
         {/* Price / Locked status */}
@@ -187,7 +190,7 @@ function RosterPlayerCell({ player, slotIndex, isCaptain = false, teamId, teamNa
           </span>
         ) : (
           <span className="text-[9px] text-gold-400 font-inter font-bold tabular-nums block">
-            ₣{(player.current_bid ?? player.sold_price ?? 0).toLocaleString()} FC
+            {CS}{(player.current_bid ?? player.sold_price ?? 0).toLocaleString()}
           </span>
         )}
       </div>
@@ -266,7 +269,7 @@ export function TeamRosterCard({ team, allPlayers, onAppoint }) {
           <div className="flex-shrink-0 text-right">
             <div className={`font-rajdhani font-black text-xl leading-none tabular-nums
               ${isBankrupt ? 'text-red-400' : isLow ? 'text-amber-400' : 'text-white'}`}>
-              ₣{(team.fire_coin_balance ?? 0).toLocaleString()}
+              {CS}{(team.fire_coin_balance ?? 0).toLocaleString()}
             </div>
             {isBankrupt ? (
               <span className="text-[9px] text-red-500/80 font-rajdhani font-bold uppercase tracking-widest">
@@ -290,10 +293,10 @@ export function TeamRosterCard({ team, allPlayers, onAppoint }) {
           </span>
           {totalSpent > 0 ? (
             <span className="text-gold-400 font-inter font-semibold tabular-nums">
-              ₣{totalSpent.toLocaleString()} spent
+              {CS}{totalSpent.toLocaleString()} spent
             </span>
           ) : (
-            <span className="text-muted font-inter">0 coins spent</span>
+            <span className="text-muted font-inter">0 spent</span>
           )}
         </div>
       </div>
@@ -327,7 +330,7 @@ export function TeamRosters({ teams, players, loading, onAppoint }) {
   const [resetMsg, setResetMsg]   = useState(null);
 
   const handleResetAll = async () => {
-    if (!window.confirm('Are you sure you want to completely empty all franchise rosters & reset balances to 40,000 FC?')) {
+    if (!window.confirm('Are you sure you want to completely empty all franchise rosters & reset balances to starting values?')) {
       return;
     }
     setResetting(true);
@@ -423,7 +426,7 @@ export function TeamRosters({ teams, players, loading, onAppoint }) {
           { label: 'Total Lineup Slots',    value: `${totalRosterPlayers} / ${teams.length * MAX_ROSTER_SIZE}`, color: 'text-white' },
           { label: 'Franchise Captains',    value: `${activeCaptainsCount} Appointed`,                   color: 'text-amber-400' },
           { label: 'Auction Draft Slots',   value: `${totalDrafted} / ${teams.length * MAX_ROSTER_SIZE} (${totalAvailableAuctionSlots} Open)`, color: 'text-gold-400' },
-          { label: 'Total Coins Spent',     value: `₣${totalCoinsSpent.toLocaleString()}`,                     color: 'text-fire-400' },
+          { label: 'Total Spent',            value: `${CS}${totalCoinsSpent.toLocaleString()}`,                   color: 'text-fire-400' },
         ].map(({ label, value, color }) => (
           <div key={label} className="card px-4 py-3 flex flex-col gap-0.5 border border-surface-600/40">
             <span className="text-[9px] text-muted font-inter uppercase tracking-widest">{label}</span>

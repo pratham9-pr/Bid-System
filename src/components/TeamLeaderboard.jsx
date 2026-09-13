@@ -51,6 +51,16 @@ export function TeamLeaderboard({ teams = [] }) {
     return balB - balA;
   });
 
+  if (!teams || teams.length === 0) {
+    return (
+      <div className="card p-12 text-center text-muted font-inter text-sm border border-white/10 bg-[#0c0d12]">
+        <p className="text-white/40 font-rajdhani uppercase tracking-widest text-sm">
+          ⏳ Awaiting Tournament Data — No Teams Configured
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{

@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { addPlayer } from '../services/auctionService';
 import { RoleBadge, TOURNAMENT_ROLES } from './RoleBadge';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
+
+const { currencySymbol: CS } = PLATFORM_CONFIG;
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const UploadIcon = () => (
@@ -214,7 +217,7 @@ export function AddPlayerForm({ onSuccess }) {
 
               {/* Price row */}
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Base Price (₣)" htmlFor="player-base" error={errors.basePrice}>
+                <Field label={`Base Price (${CS})`} htmlFor="player-base" error={errors.basePrice}>
                   <input
                     id="player-base"
                     type="number"
@@ -226,7 +229,7 @@ export function AddPlayerForm({ onSuccess }) {
                     disabled={loading || success}
                   />
                 </Field>
-                <Field label="Max Limit (₣)" htmlFor="player-max" error={errors.maxLimit}>
+                <Field label={`Max Limit (${CS})`} htmlFor="player-max" error={errors.maxLimit}>
                   <input
                     id="player-max"
                     type="number"
@@ -243,26 +246,31 @@ export function AddPlayerForm({ onSuccess }) {
               {/* Role */}
               <Field label="Role" htmlFor="player-role" error={errors.role}>
                 <div className="relative">
-                  <select
+                  <input
                     id="player-role"
+                    list="suggested-roles"
+                    type="text"
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
+                    placeholder="e.g. Batsman, Raider, Defender, IGL…"
                     disabled={loading || success}
-                    className={`input-field appearance-none pr-10 font-inter cursor-pointer
-                      ${!role ? 'text-muted' : 'text-white'}`}
-                  >
-                    <option value="" disabled>Select a role…</option>
-                    {TOURNAMENT_ROLES.map((r) => (
-                      <option key={r} value={r} className="bg-surface-800 text-white">{r}</option>
-                    ))}
-                  </select>
-                  {/* Chevron */}
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-muted">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         strokeWidth="2" className="w-4 h-4">
-                      <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
+                    className="input-field font-inter"
+                  />
+                  <datalist id="suggested-roles">
+                    <option value="Batsman" />
+                    <option value="Bowler" />
+                    <option value="All-Rounder" />
+                    <option value="WK" />
+                    <option value="Forward" />
+                    <option value="Midfielder" />
+                    <option value="Defender" />
+                    <option value="Goalkeeper" />
+                    <option value="Raider" />
+                    <option value="Captain" />
+                    <option value="IGL" />
+                    <option value="Rusher" />
+                    <option value="Sniper" />
+                  </datalist>
                 </div>
                 {/* Live badge preview */}
                 {role && (

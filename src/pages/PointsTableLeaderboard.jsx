@@ -59,7 +59,7 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
   // 1. Primary: Sort descending by Points (PTS)
   // 2. Secondary fallback: Sort descending by Score Differential (+/- DIFF)
   // 3. Tertiary fallback: Sort descending by Wins (W)
-  // 4. Quaternary fallback: Sort descending by Fire Coin Balance
+  // 4. Quaternary fallback: Sort descending by Purse Balance
   const sortedTeams = [...activeTeamsList].sort((a, b) => {
     const ptsA = Number(a.pts) || 0;
     const ptsB = Number(b.pts) || 0;
@@ -77,6 +77,22 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
     const balB = Number(b.balance) || 0;
     return balB - balA;
   });
+
+  if (!teams || teams.length === 0) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0c] flex flex-col items-center justify-center p-8">
+        <div className="border-b border-white/10 w-full max-w-5xl pb-4 mb-8">
+          <h1 className="text-white/50 text-xl tracking-[0.3em] font-bold uppercase text-center">
+            {tournamentName ? `${tournamentName} — Official Standings` : 'Official Standings'}
+          </h1>
+        </div>
+        <div className="w-3 h-3 rounded-full bg-white/20 animate-ping mb-4" />
+        <h2 className="text-white/30 text-lg tracking-widest uppercase">
+          Awaiting Tournament Data...
+        </h2>
+      </div>
+    );
+  }
 
   return (
     <div

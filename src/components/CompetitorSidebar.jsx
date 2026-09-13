@@ -3,6 +3,9 @@ import { useAllTeams } from '../hooks/useAllTeams';
 import { useAllPlayers } from '../hooks/useAllPlayers';
 import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
 import { getTeamDisplayName } from '../config/teamsConfig';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
+
+const { currencySymbol: CS } = PLATFORM_CONFIG;
 
 // ─── Animated Number Hook ────────────────────────────────────────────────────
 // Interpolates from the previous value to the new value using a cubic ease-out
@@ -119,7 +122,7 @@ function TeamRow({ team, rank, players = [] }) {
                 ? 'text-fire-300'
                 : 'text-white'
           }`}>
-          {isBankrupt ? '₣ 0' : `₣${animated.toLocaleString()}`}
+          {isBankrupt ? `${CS} 0` : `${CS}${animated.toLocaleString()}`}
         </div>
 
         {/* Warning label */}

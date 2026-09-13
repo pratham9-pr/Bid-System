@@ -3,6 +3,9 @@ import { useAllPlayers } from '../hooks/useAllPlayers';
 import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
 import { computeMaxAllowedBid, DEFAULT_TEAM_PURSE, MIN_BASE_PRICE } from '../services/auctionService';
 import { getTeamDisplayName } from '../config/teamsConfig';
+import { PLATFORM_CONFIG } from '../config/platformConfig';
+
+const { currencySymbol: CS } = PLATFORM_CONFIG;
 
 // Flame icon SVG
 const FlameIcon = () => (
@@ -40,7 +43,7 @@ export function MyBalanceWidget({ team }) {
             <div className="w-7 h-7 rounded-lg bg-gold-500/15 flex items-center justify-center text-gold-400">
               <FlameIcon />
             </div>
-            <span className="stat-label">My Fire Coins</span>
+            <span className="stat-label">My Balance</span>
           </div>
 
           <span className={`px-2 py-0.5 rounded text-[10px] font-rajdhani font-black uppercase tracking-wider
@@ -52,7 +55,7 @@ export function MyBalanceWidget({ team }) {
         {/* Main balance number */}
         <div className="flex items-end gap-1">
           <span className={`font-rajdhani text-3xl font-bold leading-none ${isBankrupt ? 'text-red-400' : isLow ? 'text-amber-400' : 'text-gold-400'}`}>
-            ₣
+            {CS}
           </span>
           <span className={`font-rajdhani font-bold text-4xl leading-none tracking-tight tabular-nums
             ${isBankrupt ? 'text-red-400' : isLow ? 'text-amber-300' : 'text-white'}`}>
@@ -69,7 +72,7 @@ export function MyBalanceWidget({ team }) {
           />
         </div>
         <p className="text-[9px] text-muted font-inter mt-1">
-          {Math.round(budgetPct)}% of ₣{DEFAULT_TEAM_PURSE.toLocaleString()} starting purse spent
+          {Math.round(budgetPct)}% of {CS}{DEFAULT_TEAM_PURSE.toLocaleString()} starting purse spent
         </p>
 
         {/* ── Dynamic Max Bid section ───────────────────────────────────────── */}
@@ -83,12 +86,12 @@ export function MyBalanceWidget({ team }) {
               </span>
               <span className={`font-rajdhani font-black text-sm tabular-nums
                 ${isLow ? 'text-red-400' : 'text-white'}`}>
-                ₣{maxAllowedBid.toLocaleString()}
+                {CS}{maxAllowedBid.toLocaleString()}
               </span>
             </div>
             <p className="text-[9px] text-muted font-inter leading-relaxed">
-              ₣{teamBalance.toLocaleString()} purse
-              {reserved > 0 && <> − <span className="text-amber-500/80">₣{reserved.toLocaleString()} reserved</span> for {remainingSlots - 1} more slot{remainingSlots - 1 !== 1 ? 's' : ''}</>}
+              {CS}{teamBalance.toLocaleString()} purse
+              {reserved > 0 && <> − <span className="text-amber-500/80">{CS}{reserved.toLocaleString()} reserved</span> for {remainingSlots - 1} more slot{remainingSlots - 1 !== 1 ? 's' : ''}</>}
             </p>
             {isLow && (
               <p className="text-[9px] text-red-400 font-inter font-semibold">
