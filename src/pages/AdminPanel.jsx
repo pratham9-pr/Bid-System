@@ -9,6 +9,7 @@ import { TeamLeaderboard } from '../components/TeamLeaderboard';
 import { StandingsControlMatrix } from '../components/StandingsControlMatrix';
 import { AddPlayerForm } from '../components/AddPlayerForm';
 import { TeamRosters } from '../components/TeamRosters';
+import HostTournamentSetup from '../components/HostTournamentSetup';
 import { getTeamDisplayName, TEAMS_CONFIG } from '../config/teamsConfig';
 import { seedDatabase, hardResetDatabase, revealPlayer, hidePlayer, startBidding, closeBidding, manualSellToTeam, setBroadcastView } from '../services/auctionService';
 
@@ -18,9 +19,9 @@ export default function AdminPanel() {
 
   // Admin tabs — role-gated
   const TABS = isAdmin
-    ? ['Players', 'Add Player', 'Rosters', 'Leaderboard']
-    : ['Players', 'Rosters', 'Leaderboard'];
-  const [activeTab, setActiveTab] = useState('Players');
+    ? ['Tournament Setup', 'Players', 'Add Player', 'Rosters', 'Leaderboard']
+    : ['Tournament Setup', 'Players', 'Rosters', 'Leaderboard'];
+  const [activeTab, setActiveTab] = useState('Tournament Setup');
   const [seedMsg,   setSeedMsg]   = useState('');
   const [seeding,   setSeeding]   = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -197,6 +198,13 @@ export default function AdminPanel() {
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-5">
+
+        {/* Tournament Setup tab */}
+        {activeTab === 'Tournament Setup' && (
+          <div className="max-w-6xl mx-auto">
+            <HostTournamentSetup onRefresh={refetchTeams} />
+          </div>
+        )}
 
         {/* Players tab */}
         {activeTab === 'Players' && (

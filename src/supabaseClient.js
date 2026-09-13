@@ -1,4 +1,2 @@
-import { supabase } from './config/supabase';
-
-export { supabase };
-export default supabase;
+export * from './lib/supabaseClient';
+export { default } from './lib/supabaseClient';
