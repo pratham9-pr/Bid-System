@@ -1,122 +1,86 @@
-// ─── TEAM CONFIGURATION — SINGLE SOURCE OF TRUTH ─────────────────────────────
-// Team IDs are preserved for database FK integrity.
-// Display names, owners, and aliases are updated here and propagate across the entire application.
+// ─── TEAM CONFIGURATION — DYNAMIC MULTI-OWNER REGISTRY ─────────────────────────
+// Hardcoded dummy teams (Beta Strikers, etc.) have been completely removed.
+// All teams are dynamically loaded from the Supabase 'teams' table.
 
-export const TEAMS_CONFIG = [
+export const TEAMS_CONFIG = [];
+
+// Color themes dynamically assigned to teams for broadcast & UI cards
+const PALETTES = [
   {
-    id: 'alpha_wolves',
-    aliases: ['alpha_wolves', 'team_alpha', 'alpha', '1', 'alpha wolves', 'power hawks', 'power_hawks', 'powerhawks'],
-    name: 'POWER HAWKS',
-    owner: 'NX4 SILENT',
-    shortName: 'PWR',
-    logo: '/power-hawks.png',
     color: 'border-fire-500/40 text-fire-400 bg-fire-500/10 hover:border-fire-500/80 hover:bg-fire-500/20 shadow-[0_0_20px_rgba(249,115,22,0.15)]',
     accentColor: 'rgba(249,115,22,0.15)',
-    isPending: false,
-    defaultStats: { wins: 5, losses: 1, diff: '+42', pts: 98 },
   },
   {
-    id: 'beta_strikers',
-    aliases: ['beta_strikers', 'team_beta', 'beta', '2', 'beta strikers', 'team vortex', 'team_vortex', 'vortex'],
-    name: 'TEAM VORTEX',
-    owner: 'MOKSHII FF',
-    shortName: 'VTX',
-    logo: '/team-vortex.png',
     color: 'border-sky-500/40 text-sky-400 bg-sky-500/10 hover:border-sky-500/80 hover:bg-sky-500/20 shadow-[0_0_20px_rgba(14,165,233,0.15)]',
     accentColor: 'rgba(14,165,233,0.15)',
-    isPending: false,
-    defaultStats: { wins: 4, losses: 2, diff: '+28', pts: 84 },
   },
   {
-    id: 'gamma_reapers',
-    aliases: ['gamma_reapers', 'team_gamma', 'gamma', '3', 'gamma reapers', 'abyssal ebon', 'abyssal_ebon', 'abyssal', 'ebon'],
-    name: 'ABYSSAL EBON',
-    owner: 'invincible',
-    shortName: 'ABY',
-    logo: '/abyssal-ebon.png',
     color: 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10 hover:border-emerald-500/80 hover:bg-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.15)]',
     accentColor: 'rgba(16,185,129,0.15)',
-    isPending: false,
-    defaultStats: { wins: 3, losses: 3, diff: '+12', pts: 67 },
   },
   {
-    id: 'delta_phantoms',
-    aliases: ['delta_phantoms', 'team_delta', 'delta', '4', 'delta phantoms', 'rx kudla', 'rx_kudla', 'rx', 'kudla'],
-    name: 'RX KUDLA',
-    owner: 'RX KAUSHII',
-    shortName: 'RXK',
-    logo: '/rx-kudla.png',
     color: 'border-purple-500/40 text-purple-400 bg-purple-500/10 hover:border-purple-500/80 hover:bg-purple-500/20 shadow-[0_0_20px_rgba(168,85,247,0.15)]',
     accentColor: 'rgba(168,85,247,0.15)',
-    isPending: false,
-    defaultStats: { wins: 2, losses: 4, diff: '-18', pts: 49 },
+  },
+  {
+    color: 'border-amber-500/40 text-amber-400 bg-amber-500/10 hover:border-amber-500/80 hover:bg-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.15)]',
+    accentColor: 'rgba(245,158,11,0.15)',
+  },
+  {
+    color: 'border-rose-500/40 text-rose-400 bg-rose-500/10 hover:border-rose-500/80 hover:bg-rose-500/20 shadow-[0_0_20px_rgba(244,63,94,0.15)]',
+    accentColor: 'rgba(244,63,94,0.15)',
   },
 ];
 
-/** Returns display name for a team ID or legacy name, with guaranteed fallback */
+/** Returns a deterministic color palette based on team ID string */
+export function getTeamPalette(teamId) {
+  if (!teamId) return PALETTES[0];
+  let hash = 0;
+  const str = String(teamId);
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  const index = Math.abs(hash) % PALETTES.length;
+  return PALETTES[index];
+}
+
+/** Returns display name for a team ID or database name */
 export function getTeamDisplayName(teamId, dbName = null) {
-  const cleanId = String(teamId || '').toLowerCase().trim();
-  const cleanName = String(dbName || '').toLowerCase().trim();
-  if (!cleanId && !cleanName) return 'UNKNOWN TEAM';
-
-  // 1. Direct configuration lookup
-  const config = TEAMS_CONFIG.find(
-    (t) =>
-      t.id === cleanId ||
-      t.aliases?.includes(cleanId) ||
-      cleanId.includes(t.id) ||
-      (cleanName && (t.id === cleanName || t.aliases?.includes(cleanName) || cleanName.includes(t.id) || cleanName.includes(t.name.toLowerCase())))
-  );
-
-  if (config) return config.name;
-
-  // 2. Pattern matching fallbacks to guaranteed 4 franchise names
-  if (cleanId.includes('alpha') || cleanId.includes('power') || cleanName.includes('alpha') || cleanName.includes('power')) {
-    return 'POWER HAWKS';
-  }
-  if (cleanId.includes('beta') || cleanId.includes('vortex') || cleanName.includes('beta') || cleanName.includes('vortex')) {
-    return 'TEAM VORTEX';
-  }
-  if (cleanId.includes('gamma') || cleanId.includes('abyssal') || cleanId.includes('ebon') || cleanName.includes('gamma') || cleanName.includes('abyssal') || cleanName.includes('ebon')) {
-    return 'ABYSSAL EBON';
-  }
-  if (cleanId.includes('delta') || cleanId.includes('kudla') || cleanId.includes('rx') || cleanName.includes('delta') || cleanName.includes('kudla') || cleanName.includes('rx')) {
-    return 'RX KUDLA';
-  }
-
-  return dbName || teamId || 'UNKNOWN TEAM';
+  if (dbName && String(dbName).trim() !== '') return String(dbName).trim();
+  if (teamId && String(teamId).trim() !== '') return String(teamId).trim();
+  return 'UNKNOWN TEAM';
 }
 
-/** Returns owner name for a team ID with fallback */
+/** Returns owner name for a team */
 export function getTeamOwner(teamId, dbOwner = null) {
-  const cleanId = String(teamId || '').toLowerCase().trim();
-  const cleanDb = String(dbOwner || '').toLowerCase().trim();
+  if (dbOwner && String(dbOwner).trim() !== '') return String(dbOwner).trim();
+  return 'PENDING';
+}
 
-  const config = TEAMS_CONFIG.find(
-    (t) =>
-      t.id === cleanId ||
-      t.aliases?.includes(cleanId) ||
-      cleanId.includes(t.id) ||
-      (t.name && cleanId.includes(t.name.toLowerCase()))
-  );
+/** Returns team configuration object with dynamic styling */
+export function getTeamConfig(teamId, teamObj = null) {
+  if (!teamId && !teamObj) return null;
+  const id = teamObj?.id || teamId;
+  const palette = getTeamPalette(id);
 
-  // If dbOwner is stale ('tbd', 'pending', empty), prioritize the central config owner
-  if (config?.owner && (!dbOwner || cleanDb === 'tbd' || cleanDb === 'pending' || cleanDb === '')) {
-    return config.owner;
+  return {
+    id,
+    name: getTeamDisplayName(id, teamObj?.team_name || teamObj?.name),
+    owner: getTeamOwner(id, teamObj?.owner_name || teamObj?.owner),
+    logo: teamObj?.logo || '/demons_reign_logo.jpg',
+    color: teamObj?.color || palette.color,
+    accentColor: teamObj?.accentColor || palette.accentColor,
+    defaultStats: { wins: 0, losses: 0, diff: 0, pts: 0 },
+  };
+}
+
+/** Returns the team logo path, checking logo_url first, then customLogo, then fallback */
+export function getTeamLogo(teamIdOrObj, customLogo = null) {
+  if (customLogo) return customLogo;
+  if (teamIdOrObj && typeof teamIdOrObj === 'object') {
+    if (teamIdOrObj.logo_url) return teamIdOrObj.logo_url;
+    if (teamIdOrObj.logo) return teamIdOrObj.logo;
   }
-
-  return config?.owner || dbOwner || 'PENDING';
-}
-
-/** Returns team config object for a given ID or alias */
-export function getTeamConfig(teamId) {
-  if (!teamId) return null;
-  const clean = String(teamId).toLowerCase().trim();
-  return TEAMS_CONFIG.find((t) => t.id === clean || t.aliases?.includes(clean)) || null;
-}
-
-/** Returns the team logo path */
-export function getTeamLogo(teamId) {
-  const config = getTeamConfig(teamId);
-  return config?.logo || '/demons_reign_logo.jpg';
+  return '/demons_reign_logo.jpg';
 }

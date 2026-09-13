@@ -6,6 +6,7 @@ import AuctionRoom      from './pages/AuctionRoom';
 import AdminPanel       from './pages/AdminPanel';
 import BroadcastOverlay from './pages/BroadcastOverlay';
 import PointsTableLeaderboard from './pages/PointsTableLeaderboard';
+import OwnerPanel from './pages/OwnerPanel';
 
 // ─── Global Error Boundary ───────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
@@ -131,6 +132,10 @@ export default function App() {
             {/* Public Read-Only Broadcast Overlay (OBS ready) */}
             <Route path="/broadcast" element={<BroadcastOverlay />} />
             <Route path="/overlay" element={<Navigate to="/broadcast" replace />} />
+
+            {/* Owner Bidding Room (Franchise Passkey Gate + Real-Time Auction Bidding) */}
+            <Route path="/owner-panel" element={<OwnerPanel />} />
+            <Route path="/owner" element={<Navigate to="/owner-panel" replace />} />
 
             {/* Standalone Demons Reign Esports Points Table / Leaderboard (1920x1080 OBS Ready) */}
             <Route path="/leaderboard" element={<PointsTableLeaderboard />} />

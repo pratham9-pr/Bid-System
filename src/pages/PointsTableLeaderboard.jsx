@@ -1,22 +1,69 @@
-import React, { useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAllTeams } from '../hooks/useAllTeams';
-import { TEAMS_CONFIG, getTeamDisplayName, getTeamOwner, getTeamLogo } from '../config/teamsConfig';
+import { useAllPlayers } from '../hooks/useAllPlayers';
+import { TEAMS_CONFIG, getTeamDisplayName, getTeamOwner, getTeamLogo, getTeamConfig } from '../config/teamsConfig';
+import { getTeamFullRoster, MAX_ROSTER_SIZE } from '../config/franchiseCaptains';
+
+/**
+ * BalancePulse component for animated coin balances
+ */
+function BalancePulse({ balance, isRank1 }) {
+  const prevRef = useRef(balance);
+  const [isDecreasing, setIsDecreasing] = useState(false);
+
+  useEffect(() => {
+    if (prevRef.current !== undefined && balance < prevRef.current) {
+      setIsDecreasing(true);
+      const timer = setTimeout(() => setIsDecreasing(false), 700);
+      prevRef.current = balance;
+      return () => clearTimeout(timer);
+    }
+    prevRef.current = balance;
+  }, [balance]);
+
+  return (
+    <motion.span
+      animate={
+        isDecreasing
+          ? {
+              scale: [1, 1.1, 1],
+              color: ['#fbbf24', '#ef4444', '#fbbf24'],
+              textShadow: [
+                '0 0 0px rgba(239,68,68,0)',
+                '0 0 14px rgba(239,68,68,0.9)',
+                '0 0 0px rgba(239,68,68,0)',
+              ],
+            }
+          : { scale: 1 }
+      }
+      transition={{ duration: 0.6, ease: 'easeInOut' }}
+      className={`inline-flex items-center gap-1 tabular-nums font-black italic text-lg sm:text-2xl tracking-tight ${
+        isRank1 ? 'text-amber-300 drop-shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'text-amber-400'
+      }`}
+    >
+      <span className="text-sm font-black">₣</span>
+      <span className="tabular-nums">{balance.toLocaleString()}</span>
+    </motion.span>
+  );
+}
 
 // ─── DEMONS REIGN ESPORTS POINTS TABLE & LEADERBOARD COMPONENT ────────────────
 export default function PointsTableLeaderboard({ transparentBg: propTransparentBg } = {}) {
   const { teams } = useAllTeams();
+  const { players } = useAllPlayers();
   const [internalTransparentBg, setInternalTransparentBg] = useState(false);
   const transparentBg = propTransparentBg !== undefined ? propTransparentBg : internalTransparentBg;
   const setTransparentBg = setInternalTransparentBg;
 
-  // Merge live database teams with configuration and stats
+  // Merge live database teams with configuration, roster count, and stats
   const activeTeamsList = (teams && teams.length > 0 ? teams : TEAMS_CONFIG).map((t, idx) => {
     const config = getTeamConfig(t.id) || TEAMS_CONFIG.find((c) => c.id === t.id) || TEAMS_CONFIG[idx] || {};
-    const teamId = t.id || config.id;
-    const displayName = getTeamDisplayName(teamId, t.team_name || t.name || config.name);
-    const ownerName = getTeamOwner(teamId, t.owner_name || t.owner || config.owner);
-    const logoUrl = getTeamLogo(teamId);
+    // Strictly unique team id
+    const uniqueTeamId = String(t.id || config.id || `team_${idx + 1}`);
+    const displayName = getTeamDisplayName(uniqueTeamId, t.team_name || t.name || config.name);
+    const ownerName = getTeamOwner(uniqueTeamId, t.owner_name || t.owner || config.owner);
+    const logoUrl = t.logo_url || t.logo || getTeamLogo(t) || config.logo || '/demons_reign_logo.jpg';
     const defaultStats = config.defaultStats || { wins: 0, losses: 0, diff: '0', pts: 0 };
 
     const wins = typeof t.wins === 'number' ? t.wins : defaultStats.wins;
@@ -24,14 +71,20 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
     const rawDiff = t.score_diff ?? t.diff ?? defaultStats.diff;
     const diffNum = typeof rawDiff === 'string' ? parseInt(rawDiff.replace('+', ''), 10) || 0 : (Number(rawDiff) || 0);
     const pts = typeof t.points === 'number' ? t.points : (typeof t.pts === 'number' ? t.pts : defaultStats.pts);
-    const balance = t.fire_coin_balance ?? 40000;
+    const balance = typeof t.fire_coin_balance === 'number' ? t.fire_coin_balance : (typeof t.purse === 'number' ? t.purse : 40000);
+
+    const { totalCount = 0, remainingSlots = MAX_ROSTER_SIZE, isFull = false } = getTeamFullRoster(uniqueTeamId, players);
 
     return {
       ...t,
-      teamId,
+      id: uniqueTeamId,
+      teamId: uniqueTeamId,
       displayName,
       ownerName,
       logoUrl,
+      playerCount: totalCount,
+      remainingSlots,
+      isFull,
       wins,
       losses,
       diff: diffNum,
@@ -68,12 +121,12 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
   return (
     <div
       className={`w-screen h-screen min-h-[720px] flex flex-col justify-between p-4 sm:p-6 lg:p-8 relative overflow-hidden select-none font-rajdhani transition-colors duration-300
-        ${transparentBg ? 'bg-transparent' : 'bg-[#0a0a0c]'}`}
+        ${transparentBg ? 'bg-transparent' : 'bg-black/60 backdrop-blur-xl'}`}
     >
       {/* ── Background Tactical Grid Pattern (Esports Tech Overlay) ────────── */}
       {!transparentBg && (
         <div
-          className="absolute inset-0 pointer-events-none opacity-25"
+          className="absolute inset-0 pointer-events-none opacity-20"
           style={{
             backgroundImage: `
               linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
@@ -87,38 +140,32 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
       {/* ── Ambient High-Contrast Stage Glow Blobs ──────────────────────── */}
       {!transparentBg && (
         <>
-          <div className="absolute -top-24 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-[140px] pointer-events-none" />
-          <div className="absolute top-1/3 right-1/4 w-[30rem] h-[30rem] bg-sky-500/10 rounded-full blur-[160px] pointer-events-none" />
-          <div className="absolute -bottom-20 left-1/2 -translate-x-1/2 w-[40rem] h-64 bg-fire-600/10 rounded-full blur-[150px] pointer-events-none" />
+          <div className="absolute -top-24 left-1/4 w-96 h-96 bg-red-600/10 rounded-full blur-[140px] pointer-events-none" />
+          <div className="absolute top-1/3 right-1/4 w-[30rem] h-[30rem] bg-orange-600/10 rounded-full blur-[160px] pointer-events-none" />
+          <div className="absolute -bottom-20 left-1/2 -translate-x-1/2 w-[40rem] h-64 bg-amber-600/10 rounded-full blur-[150px] pointer-events-none" />
         </>
       )}
 
       {/* ===================================================================== */}
-      {/* 1. TOURNAMENT HEADER (Aggressive Chamfered Esports Geometry)          */}
+      {/* 1. TOURNAMENT HEADER                                                  */}
       {/* ===================================================================== */}
       <header className="w-full relative z-20 flex-shrink-0 mb-4">
         <div
-          style={{
-            clipPath: 'polygon(0% 0%, calc(100% - 24px) 0%, 100% 24px, 100% 100%, 24px 100%, 0% calc(100% - 24px))',
-          }}
-          className="w-full bg-[#11131a]/95 border-2 border-white/15 px-6 py-3.5 flex items-center justify-between shadow-[0_10px_35px_rgba(0,0,0,0.8)] backdrop-blur-xl relative"
+          className="w-full bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl px-6 py-3.5 flex items-center justify-between shadow-[0_10px_35px_rgba(0,0,0,0.8)] relative"
         >
-          {/* Top Edge Neon Accent */}
-          <div className="absolute top-0 inset-x-8 h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-80" />
+          {/* Top Edge Red/Orange Neon Accent */}
+          <div className="absolute top-0 inset-x-8 h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-80" />
 
           {/* Left: Tournament Branding */}
           <div className="flex items-center gap-4">
             <div
-              style={{
-                clipPath: 'polygon(20% 0%, 100% 0%, 80% 100%, 0% 100%)',
-              }}
-              className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 p-0.5 flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.5)]"
+              className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-600 to-orange-500 p-0.5 flex items-center justify-center shadow-[0_0_20px_rgba(239,68,68,0.4)]"
             >
-              <div className="w-full h-full bg-black flex items-center justify-center p-1">
+              <div className="w-full h-full bg-black/90 rounded-[10px] flex items-center justify-center p-1">
                 <img
                   src="/demons_reign_logo.jpg"
                   alt="Demons Reign"
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover rounded-lg"
                 />
               </div>
             </div>
@@ -126,27 +173,24 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-rajdhani font-black italic text-2xl sm:text-3xl text-white tracking-[0.12em] uppercase leading-none">
-                  DEMONS <span className="text-gradient-gold">REIGN</span>
+                  DEMONS <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-400 to-amber-400">REIGN</span>
                 </h1>
                 <span
-                  style={{
-                    clipPath: 'polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%)',
-                  }}
-                  className="bg-amber-500 text-black font-black italic text-[11px] px-3 py-0.5 uppercase tracking-wider"
+                  className="bg-red-600/25 border border-red-500/40 text-red-400 font-black italic text-[11px] px-3 py-0.5 rounded-md uppercase tracking-wider"
                 >
-                  OFFICIAL STAGE
+                  LIVE BROADCAST
                 </span>
               </div>
               <p className="font-rajdhani font-bold text-xs tracking-[0.3em] text-slate-400 uppercase mt-1">
-                OFFICIAL OVERALL STANDINGS • POINTS TABLE
+                FREE FIRE AUCTION • OFFICIAL STANDINGS OVERLAY
               </p>
             </div>
           </div>
 
           {/* Right: Broadcast Status & OBS Switch */}
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-1.5 rounded-none bg-black/60 border border-white/10">
-              <span className="w-2.5 h-2.5 rounded-full bg-fire-500 animate-ping" />
+            <div className="flex items-center gap-2 px-4 py-1.5 rounded-xl bg-black/40 border border-white/10">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping" />
               <span className="font-black italic text-xs uppercase tracking-widest text-white">
                 LIVE BROADCAST FEED
               </span>
@@ -154,10 +198,10 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
 
             <button
               onClick={() => setTransparentBg((prev) => !prev)}
-              className="px-3 py-1.5 bg-surface-800 border border-white/20 text-slate-300 hover:text-white hover:border-amber-400 font-bold text-xs uppercase tracking-wider cursor-pointer transition-colors"
+              className="px-3 py-1.5 bg-white/5 border border-white/10 hover:border-red-500/40 text-slate-300 hover:text-white rounded-xl font-bold text-xs uppercase tracking-wider cursor-pointer transition-colors"
               title="Toggle background transparency for OBS Studio"
             >
-              {transparentBg ? 'OBS: Transparent' : 'OBS: Solid'}
+              {transparentBg ? 'OBS: Transparent' : 'OBS: Frosted'}
             </button>
           </div>
         </div>
@@ -171,136 +215,109 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
 
           {/* ── Table Header Strip ────────────────────────────────────────── */}
           <div
-            style={{
-              clipPath: 'polygon(0% 0%, calc(100% - 16px) 0%, 100% 16px, 100% 100%, 16px 100%, 0% calc(100% - 16px))',
-            }}
-            className="w-full bg-[#141620] border-t border-b border-white/15 px-6 py-2 flex items-center justify-between text-slate-400 font-black italic tracking-[0.2em] text-xs sm:text-sm uppercase"
+            className="w-full bg-white/[0.02] border border-white/10 rounded-xl px-6 py-2.5 flex items-center justify-between text-slate-400 font-black italic tracking-[0.2em] text-xs sm:text-sm uppercase"
           >
-            <div className="w-24 sm:w-28 text-center flex-shrink-0">
+            <div className="w-20 sm:w-24 text-center flex-shrink-0">
               <span>RANK</span>
             </div>
             <div className="flex-1 pl-4 text-left">
               <span>FRANCHISE TEAM</span>
             </div>
-            <div className="w-20 sm:w-24 text-center flex-shrink-0">
+            <div className="w-24 sm:w-28 text-center flex-shrink-0">
+              <span>ROSTER</span>
+            </div>
+            <div className="w-32 sm:w-36 text-right pr-4 flex-shrink-0">
+              <span>PURSE (₣ FC)</span>
+            </div>
+            <div className="w-16 sm:w-20 text-center flex-shrink-0">
               <span>W</span>
             </div>
-            <div className="w-20 sm:w-24 text-center flex-shrink-0">
+            <div className="w-16 sm:w-20 text-center flex-shrink-0">
               <span>L</span>
             </div>
-            <div className="w-24 sm:w-28 text-center flex-shrink-0">
+            <div className="w-20 sm:w-24 text-center flex-shrink-0">
               <span>DIFF (+/-)</span>
             </div>
-            <div className="w-32 sm:w-40 text-center flex-shrink-0 text-amber-400">
+            <div className="w-28 sm:w-36 text-center flex-shrink-0 text-amber-400">
               <span>TOTAL PTS</span>
             </div>
           </div>
 
-          {/* ── Team Standings Rows (Aggressive Chamfered Thick Cards) ─────── */}
-          <div className="flex flex-col gap-3">
+          {/* ── Team Standings Rows: <motion.ul> with layout spring transitions and cascade ── */}
+          <motion.ul className="flex flex-col gap-3 list-none m-0 p-0">
             {sortedTeams.map((team, index) => {
               const rank = index + 1;
               const isRank1 = rank === 1;
-              const isRank2 = rank === 2;
-              const isRank3 = rank === 3;
-
-              // Row Tier Styling Configuration
-              const rowClasses = isRank1
-                ? {
-                    card: 'bg-gradient-to-r from-amber-500/25 via-yellow-600/15 to-[#0e0d08] border-2 border-yellow-500/80 shadow-[0_0_35px_rgba(234,179,8,0.25)]',
-                    rankBadge: 'bg-gradient-to-r from-yellow-400 to-amber-500 text-black',
-                    rankText: 'text-black font-black italic',
-                    teamNameText: 'text-white text-gradient-gold',
-                    ptsText: 'text-gradient-gold drop-shadow-[0_0_25px_rgba(234,179,8,0.85)] text-4xl sm:text-5xl',
-                    ptsBadge: 'bg-amber-500/20 border-amber-500/50',
-                    borderAccent: 'border-l-4 border-l-yellow-400',
-                  }
-                : isRank2
-                ? {
-                    card: 'bg-gradient-to-r from-sky-500/20 via-slate-400/10 to-[#080d14] border-2 border-sky-400/60 shadow-[0_0_30px_rgba(56,189,248,0.2)]',
-                    rankBadge: 'bg-gradient-to-r from-sky-300 to-cyan-500 text-black',
-                    rankText: 'text-black font-black italic',
-                    teamNameText: 'text-white',
-                    ptsText: 'text-sky-300 drop-shadow-[0_0_20px_rgba(56,189,248,0.7)] text-3xl sm:text-4xl',
-                    ptsBadge: 'bg-sky-500/20 border-sky-400/40',
-                    borderAccent: 'border-l-4 border-l-sky-400',
-                  }
-                : isRank3
-                ? {
-                    card: 'bg-gradient-to-r from-[#171822] via-[#12131b] to-[#0a0a0d] border border-amber-600/30 hover:border-amber-500/50 shadow-[0_0_20px_rgba(0,0,0,0.6)]',
-                    rankBadge: 'bg-amber-900/80 text-amber-300 border border-amber-600/50',
-                    rankText: 'text-amber-200 font-black italic',
-                    teamNameText: 'text-slate-100',
-                    ptsText: 'text-amber-200 text-2xl sm:text-3xl',
-                    ptsBadge: 'bg-black/40 border-white/10',
-                    borderAccent: 'border-l-4 border-l-amber-600',
-                  }
-                : {
-                    card: 'bg-gradient-to-r from-[#13141a] via-[#0f1015] to-[#08080a] border border-white/10 hover:border-white/20 shadow-[0_0_20px_rgba(0,0,0,0.6)]',
-                    rankBadge: 'bg-surface-800 text-slate-400 border border-white/10',
-                    rankText: 'text-slate-300 font-black italic',
-                    teamNameText: 'text-slate-300',
-                    ptsText: 'text-slate-200 text-2xl sm:text-3xl',
-                    ptsBadge: 'bg-black/40 border-white/10',
-                    borderAccent: 'border-l-4 border-l-surface-600',
-                  };
 
               return (
-                <motion.div
-                  key={team.teamId}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.08, duration: 0.3 }}
-                  style={{
-                    clipPath: 'polygon(0% 0%, calc(100% - 20px) 0%, 100% 20px, 100% 100%, 20px 100%, 0% calc(100% - 20px))',
+                <motion.li
+                  key={team.id}
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 300,
+                    damping: 30,
+                    opacity: { duration: 0.35, delay: index * 0.08 },
+                    y: { type: 'spring', stiffness: 300, damping: 30, delay: index * 0.08 },
                   }}
-                  className={`w-full py-3 sm:py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all duration-300 ${rowClasses.card}`}
+                  className={`w-full py-3.5 px-6 rounded-2xl flex items-center justify-between transition-colors duration-300 relative overflow-hidden
+                    ${
+                      isRank1
+                        ? 'bg-gradient-to-r from-red-900/40 to-transparent border border-red-500/40 shadow-[inset_0_0_15px_rgba(239,68,68,0.25),0_0_25px_rgba(239,68,68,0.15)] ring-1 ring-inset ring-red-500/30'
+                        : 'bg-gradient-to-r from-gray-900 to-transparent border border-white/10 hover:border-white/20'
+                    }`}
                 >
+                  {/* Left rank accent stripe on #1 */}
+                  {isRank1 && (
+                    <div className="absolute left-0 inset-y-0 w-1.5 bg-gradient-to-b from-red-500 via-orange-500 to-amber-500" />
+                  )}
+
                   {/* ── 1. RANK BADGE ────────────────────────────────────────── */}
-                  <div className="w-24 sm:w-28 flex items-center justify-center flex-shrink-0">
+                  <div className="w-20 sm:w-24 flex items-center justify-center flex-shrink-0">
                     <div
-                      style={{
-                        clipPath: 'polygon(15% 0%, 100% 0%, 85% 100%, 0% 100%)',
-                      }}
-                      className={`px-4 sm:px-5 py-1.5 flex items-center justify-center gap-1.5 shadow-md ${rowClasses.rankBadge}`}
+                      className={`px-4 py-1.5 rounded-xl flex items-center justify-center gap-1.5 font-black italic text-lg sm:text-xl tabular-nums shadow-md
+                        ${
+                          isRank1
+                            ? 'bg-gradient-to-r from-red-500 via-orange-500 to-amber-500 text-black shadow-[0_0_15px_rgba(239,68,68,0.5)] ring-2 ring-amber-400/50'
+                            : rank === 2
+                            ? 'bg-slate-300 text-slate-900'
+                            : rank === 3
+                            ? 'bg-amber-800 text-amber-200'
+                            : 'bg-surface-800 text-slate-300 border border-white/10'
+                        }`}
                     >
-                      {isRank1 && <span className="text-base leading-none">👑</span>}
-                      <span className={`text-xl sm:text-2xl tracking-tighter ${rowClasses.rankText}`}>
-                        #{rank}
-                      </span>
+                      {isRank1 && <span className="text-sm">👑</span>}
+                      <span className="tabular-nums">#{rank}</span>
                     </div>
                   </div>
 
                   {/* ── 2. TEAM LOGO & IDENTITY ──────────────────────────────── */}
-                  <div className="flex-1 pl-3 sm:pl-4 flex items-center gap-3 sm:gap-4 min-w-0">
-                    {/* Hexagonal / Chamfered Emblem Container */}
+                  <div className="flex-1 pl-4 flex items-center gap-3 sm:gap-4 min-w-0">
                     <div
-                      style={{
-                        clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-                      }}
-                      className={`w-12 h-12 sm:w-14 sm:h-14 p-0.5 flex-shrink-0 flex items-center justify-center bg-black
-                        ${isRank1 ? 'bg-gradient-to-b from-yellow-400 to-amber-600 shadow-[0_0_20px_rgba(234,179,8,0.5)]'
-                          : isRank2 ? 'bg-gradient-to-b from-sky-400 to-cyan-600 shadow-[0_0_20px_rgba(56,189,248,0.4)]'
-                          : 'border border-white/20'}`}
+                      className={`w-12 h-12 sm:w-14 sm:h-14 p-0.5 rounded-xl flex-shrink-0 flex items-center justify-center bg-black/80 border
+                        ${isRank1 ? 'border-red-500/60 shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'border-white/20'}`}
                     >
-                      <div className="w-full h-full bg-[#0d0e14] flex items-center justify-center p-1 overflow-hidden">
-                        <img
-                          src={team.logoUrl}
-                          alt={team.displayName}
-                          className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
-                        />
-                      </div>
+                      <img
+                        src={team.logoUrl}
+                        alt={team.displayName}
+                        className="w-full h-full object-cover rounded-lg"
+                        onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                      />
                     </div>
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h2 className={`font-black italic text-xl sm:text-2xl lg:text-3xl uppercase tracking-[0.1em] truncate leading-none ${rowClasses.teamNameText}`}>
+                        <h2
+                          className={`font-black italic text-xl sm:text-2xl lg:text-3xl uppercase tracking-[0.1em] truncate leading-none
+                            ${isRank1 ? 'text-transparent bg-clip-text bg-gradient-to-r from-white via-orange-200 to-amber-300 drop-shadow-[0_0_10px_rgba(239,68,68,0.4)]' : 'text-white'}`}
+                        >
                           {team.displayName}
                         </h2>
                         {isRank1 && (
-                          <span className="hidden sm:inline-block px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">
-                            LEADER
+                          <span className="hidden sm:inline-block px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-500/20 text-red-300 border border-red-500/40 rounded">
+                            #1 LEADER
                           </span>
                         )}
                       </div>
@@ -310,46 +327,75 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
                     </div>
                   </div>
 
-                  {/* ── 3. WINS (W) ──────────────────────────────────────────── */}
-                  <div className="w-20 sm:w-24 text-center flex-shrink-0">
+                  {/* ── 3. ROSTER / PLAYERS COUNT ────────────────────────────── */}
+                  <div className="w-24 sm:w-28 text-center flex-shrink-0">
+                    <span className="font-black italic text-lg sm:text-xl text-slate-200 tabular-nums">
+                      {team.playerCount}/{MAX_ROSTER_SIZE}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">
+                      ROSTER
+                    </span>
+                  </div>
+
+                  {/* ── 4. FREE FIRE COIN BALANCE ────────────────────────────── */}
+                  <div className="w-32 sm:w-36 text-right pr-4 flex-shrink-0">
+                    <BalancePulse balance={team.balance} isRank1={isRank1} />
+                    <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">
+                      PURSE
+                    </span>
+                  </div>
+
+                  {/* ── 5. WINS (W) ──────────────────────────────────────────── */}
+                  <div className="w-16 sm:w-20 text-center flex-shrink-0">
                     <span className="font-black italic text-xl sm:text-2xl text-emerald-400 tabular-nums">
                       {team.wins}
                     </span>
                   </div>
 
-                  {/* ── 4. LOSSES (L) ────────────────────────────────────────── */}
-                  <div className="w-20 sm:w-24 text-center flex-shrink-0">
+                  {/* ── 6. LOSSES (L) ────────────────────────────────────────── */}
+                  <div className="w-16 sm:w-20 text-center flex-shrink-0">
                     <span className="font-black italic text-xl sm:text-2xl text-rose-400 tabular-nums">
                       {team.losses}
                     </span>
                   </div>
 
-                  {/* ── 5. SCORE DIFF (+/-) ──────────────────────────────────── */}
-                  <div className="w-24 sm:w-28 text-center flex-shrink-0">
-                    <span className={`font-black italic text-lg sm:text-xl tabular-nums
-                      ${team.diff > 0 ? 'text-emerald-300' : team.diff < 0 ? 'text-rose-300' : 'text-slate-300'}`}>
+                  {/* ── 7. SCORE DIFF (+/-) ──────────────────────────────────── */}
+                  <div className="w-20 sm:w-24 text-center flex-shrink-0">
+                    <span
+                      className={`font-black italic text-lg sm:text-xl tabular-nums
+                        ${team.diff > 0 ? 'text-emerald-300' : team.diff < 0 ? 'text-rose-300' : 'text-slate-300'}`}
+                    >
                       {team.formattedDiff}
                     </span>
                   </div>
 
-                  {/* ── 6. TOTAL PTS (Massive Vibrant Numeral) ────────────────── */}
-                  <div className="w-32 sm:w-40 flex items-center justify-center flex-shrink-0">
+                  {/* ── 8. TOTAL PTS (Massive Vibrant Numeral) ────────────────── */}
+                  <div className="w-28 sm:w-36 flex items-center justify-center flex-shrink-0">
                     <div
-                      style={{
-                        clipPath: 'polygon(15% 0%, 100% 0%, 85% 100%, 0% 100%)',
-                      }}
-                      className={`w-full py-1.5 px-4 flex items-center justify-center border ${rowClasses.ptsBadge}`}
+                      className={`w-full py-1.5 px-4 rounded-xl flex items-center justify-center border
+                        ${
+                          isRank1
+                            ? 'bg-red-500/20 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.3)]'
+                            : 'bg-black/40 border-white/10'
+                        }`}
                     >
-                      <span className={`font-black italic tracking-tight tabular-nums ${rowClasses.ptsText}`}>
+                      <span
+                        className={`font-black italic text-2xl sm:text-3xl tracking-tight tabular-nums
+                          ${
+                            isRank1
+                              ? 'text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-300 to-amber-300 drop-shadow-[0_0_12px_rgba(239,68,68,0.8)]'
+                              : 'text-white'
+                          }`}
+                      >
                         {team.pts}
                       </span>
                     </div>
                   </div>
 
-                </motion.div>
+                </motion.li>
               );
             })}
-          </div>
+          </motion.ul>
 
         </div>
       </main>
@@ -358,9 +404,9 @@ export default function PointsTableLeaderboard({ transparentBg: propTransparentB
       {/* 3. DEMONS REIGN ESPORTS TELEMETRY FOOTER                              */}
       {/* ===================================================================== */}
       <footer className="w-full relative z-20 flex-shrink-0 mt-2">
-        <div className="w-full py-2 px-6 bg-black/70 border-t border-white/10 flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+        <div className="w-full py-2.5 px-6 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-widest">
           <div className="flex items-center gap-3">
-            <span className="text-amber-400 font-black">DEMONS REIGN 2026</span>
+            <span className="text-red-400 font-black">DEMONS REIGN 2026</span>
             <span>•</span>
             <span>OFFICIAL AUCTION SERIES</span>
           </div>

@@ -1,45 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
 
-// ─── ASSIGNED FRANCHISE & HOST PASSWORDS ──────────────────────────────────────
+// ─── ADMIN CREDENTIALS (HOST ACCESS) ─────────────────────────────────────────
 export const TEAM_CREDENTIALS = {
   admin: {
     role: 'admin',
     name: 'Auction Host Admin',
     password: 'HOST#FF2026-X99',
     redirect: '/admin',
-  },
-  alpha_wolves: {
-    id: 'alpha_wolves',
-    aliasId: 'TEAM_ALPHA',
-    teamName: 'POWER HAWKS',
-    owner: 'NX4 SILENT',
-    password: 'ALPHA-9082-FF',
-    redirect: '/bidder',
-  },
-  beta_strikers: {
-    id: 'beta_strikers',
-    aliasId: 'TEAM_BETA',
-    teamName: 'TEAM VORTEX',
-    owner: 'MOKSHII FF',
-    password: 'BETA-4173-FF',
-    redirect: '/bidder',
-  },
-  gamma_reapers: {
-    id: 'gamma_reapers',
-    aliasId: 'TEAM_GAMMA',
-    teamName: 'Abyssal Ebon',
-    owner: 'invincible',
-    password: 'GAMMA-6315-FF',
-    redirect: '/bidder',
-  },
-  delta_phantoms: {
-    id: 'delta_phantoms',
-    aliasId: 'TEAM_DELTA',
-    teamName: 'RX KUDLA',
-    owner: 'RX KAUSHII',
-    password: 'DELTA-2849-FF',
-    redirect: '/bidder',
   },
 };
 
@@ -76,15 +44,18 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase
         .from('teams')
         .select('*')
-        .or(`id.eq.${teamId},id.eq.${teamId.toUpperCase()}`)
+        .eq('id', teamId)
         .maybeSingle();
 
       if (data && !error) {
+        const budget = data.budget ?? data.fire_coin_balance ?? 40000;
         const normalized = {
           ...data,
           teamId: data.id,
-          team_name: data.name || data.team_name,
-          owner_name: data.owner || data.owner_name || 'Pending',
+          team_name: data.team_name || data.name,
+          owner_name: data.owner_name || data.owner || 'Owner',
+          budget,
+          fire_coin_balance: budget,
         };
         setTeam(normalized);
       }
@@ -100,24 +71,25 @@ export function AuthProvider({ children }) {
   }, [currentUser?.teamId, currentUser?.id]);
 
   // ───────────────────────────────────────────────────────────────────────────
-  //  LOGIN: Supabase Teams Table Authentication + Passkey Verification
+  //  LOGIN: Dynamic Teams Table Authentication via access_pin
   // ───────────────────────────────────────────────────────────────────────────
-  const login = async (selectedRole, password) => {
-    const roleId = (selectedRole || '').trim().toLowerCase();
-    const cleanPass = (password || '').trim();
+  const login = async (selectedRoleOrTeamId, passwordOrPin) => {
+    const roleId = (selectedRoleOrTeamId || '').trim();
+    const cleanPin = (passwordOrPin || '').trim();
 
-    if (!roleId || !cleanPass) {
-      throw new Error('Please select a team/role and enter the password.');
+    if (!cleanPin) {
+      throw new Error('Please enter your access PIN or password.');
     }
 
     // 1. Host / Admin Passkey Check
-    if (roleId === 'admin') {
-      if (cleanPass !== 'HOST#FF2026-X99') {
-        throw new Error('Invalid Password / Access Denied');
+    if (roleId.toLowerCase() === 'admin' || cleanPin === 'HOST#FF2026-X99') {
+      if (cleanPin !== 'HOST#FF2026-X99') {
+        throw new Error('Invalid Admin Password / Access Denied');
       }
 
       const adminUser = {
         role: 'admin',
+        id: 'admin',
         name: 'Auction Host Admin',
         redirect: '/admin',
       };
@@ -128,44 +100,80 @@ export function AuthProvider({ children }) {
       return adminUser;
     }
 
-    // 2. Team Passkey Registry Resolution
-    const registered = TEAM_CREDENTIALS[roleId] || Object.values(TEAM_CREDENTIALS).find(
-      (c) => c.id === roleId || c.aliasId?.toLowerCase() === roleId
-    );
-
-    // 3. Supabase Team Query (supports both primary ID and alias)
+    // 2. Dynamic Team Authentication via Supabase
     let teamRecord = null;
     try {
-      const { data } = await supabase
-        .from('teams')
-        .select('*')
-        .or(`id.eq.${roleId},id.eq.${roleId.toUpperCase()},id.eq.${registered?.aliasId || roleId}`)
-        .maybeSingle();
-      teamRecord = data;
+      if (roleId && roleId !== 'bidder') {
+        // Query by team ID
+        const { data, error } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('id', roleId)
+          .maybeSingle();
+
+        if (data && !error) {
+          // Verify pin against access_pin or password
+          const actualPin = String(data.access_pin || data.password || '').trim();
+          if (actualPin.toLowerCase() === cleanPin.toLowerCase()) {
+            teamRecord = data;
+          }
+        }
+      }
+
+      // If not resolved by roleId, query directly by PIN
+      if (!teamRecord) {
+        // First try 'password' column which is active in current schema
+        const { data: passMatch } = await supabase
+          .from('teams')
+          .select('*')
+          .eq('password', cleanPin)
+          .maybeSingle();
+
+        if (passMatch) {
+          teamRecord = passMatch;
+        } else {
+          // Try 'access_pin' column if modern schema is active
+          try {
+            const { data: pinMatch } = await supabase
+              .from('teams')
+              .select('*')
+              .eq('access_pin', cleanPin)
+              .maybeSingle();
+
+            if (pinMatch) teamRecord = pinMatch;
+          } catch (pinErr) {
+            // column might not exist in current schema cache, safely ignored
+          }
+        }
+      }
+
+      // Final fallback: fetch all teams and match in-memory (resilient to column variations)
+      if (!teamRecord) {
+        const { data: allTeams } = await supabase.from('teams').select('*');
+        if (allTeams && allTeams.length > 0) {
+          teamRecord = allTeams.find((t) => {
+            const pinVal = String(t.access_pin || t.password || '').trim().toLowerCase();
+            return pinVal === cleanPin.toLowerCase();
+          });
+        }
+      }
     } catch (e) {
       console.warn('Supabase query during login:', e);
     }
 
-    // 4. Validate Password against assigned passkey OR database password column
-    const expectedPass = registered?.password;
-    const dbPass = teamRecord?.password;
-
-    const isPasswordValid = Boolean(
-      (expectedPass && cleanPass === expectedPass) ||
-      (dbPass && String(dbPass).trim() === cleanPass)
-    );
-
-    if (!isPasswordValid) {
-      throw new Error('Invalid Password / Access Denied');
+    if (!teamRecord) {
+      throw new Error('Invalid Access PIN / Team not found.');
     }
 
+    const budget = teamRecord.budget ?? teamRecord.fire_coin_balance ?? 40000;
     const bidderUser = {
-      ...(teamRecord || {}),
-      id: teamRecord?.id || registered?.id || roleId,
-      teamId: teamRecord?.id || registered?.id || roleId,
-      team_name: teamRecord?.team_name || teamRecord?.name || registered?.teamName || 'Team',
-      owner_name: teamRecord?.owner_name || teamRecord?.owner || registered?.owner || 'Owner',
-      fire_coin_balance: teamRecord?.fire_coin_balance ?? 40000,
+      ...teamRecord,
+      id: teamRecord.id,
+      teamId: teamRecord.id,
+      team_name: teamRecord.team_name || teamRecord.name || 'Team',
+      owner_name: teamRecord.owner_name || teamRecord.owner || 'Owner',
+      budget,
+      fire_coin_balance: budget,
       role: 'bidder',
       redirect: '/bidder',
     };

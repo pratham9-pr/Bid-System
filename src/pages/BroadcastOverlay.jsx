@@ -73,7 +73,7 @@ function FranchiseSidebarCard({ teamId, teams, players }) {
   const cleanName = String(teamRecord.team_name || teamRecord.name || teamConfig.name || teamId || '').toLowerCase();
   const displayName = getTeamDisplayName(teamId, teamRecord.team_name || teamRecord.name || teamConfig.name);
   const ownerName = getTeamOwner(teamId, teamRecord.owner_name || teamRecord.owner || teamConfig.owner);
-  const logoUrl = getTeamLogo(teamId);
+  const logoUrl = teamRecord.logo_url || teamRecord.logo || getTeamLogo(teamId);
   const balance = teamRecord.fire_coin_balance ?? 40000;
 
   const isPower = cleanName.includes('alpha') || cleanName.includes('power');
@@ -420,37 +420,47 @@ export default function BroadcastOverlay() {
                   </div>
 
                   {/* Leading Team Info with Mascot Logo */}
-                  <div className="mt-1.5 pt-1.5 border-t border-white/10 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-md">
-                        <img
-                          src={getTeamLogo(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id)}
-                          alt="Leading Team"
-                          className="w-full h-full object-cover rounded-full"
-                          onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
-                        />
-                      </div>
-                      <div className="text-left min-w-0">
-                        <span className="text-[8px] text-slate-400 uppercase font-rajdhani font-bold block leading-none">
-                          {isSold ? 'Acquired By' : 'Leading Franchise'}
-                        </span>
-                        <span className="text-xs sm:text-sm font-rajdhani font-black text-white uppercase tracking-wide leading-tight truncate block mt-0.5">
-                          {activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id
-                            ? getTeamDisplayName(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id, activePlayer.current_highest_bidder_name)
-                            : 'AWAITING FIRST BID'}
-                        </span>
-                      </div>
-                    </div>
+                  {(() => {
+                    const leaderTeamId = activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id;
+                    const leaderTeamRecord = (teams || []).find(
+                      (t) => String(t.id).toLowerCase() === String(leaderTeamId).toLowerCase()
+                    );
+                    const leaderLogoUrl = leaderTeamRecord?.logo_url || leaderTeamRecord?.logo || getTeamLogo(leaderTeamId);
+                    const leaderDisplayName = leaderTeamRecord?.team_name || leaderTeamRecord?.name || getTeamDisplayName(leaderTeamId, activePlayer.current_highest_bidder_name);
+                    const leaderOwnerName = leaderTeamRecord?.owner_name || leaderTeamRecord?.owner || getTeamOwner(leaderTeamId);
 
-                    <div className="text-right flex-shrink-0">
-                      <span className="text-[8px] text-slate-400 font-inter uppercase tracking-wider block">
-                        Owner
-                      </span>
-                      <span className="text-xs font-rajdhani font-bold text-amber-300 uppercase">
-                        {getTeamOwner(activePlayer.current_highest_bidder || auctionState?.highest_bidder_team_id)}
-                      </span>
-                    </div>
-                  </div>
+                    return (
+                      <div className="mt-1.5 pt-1.5 border-t border-white/10 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border border-white/20 bg-black/80 flex-shrink-0 flex items-center justify-center p-0.5 shadow-md">
+                            <img
+                              src={leaderLogoUrl}
+                              alt="Leading Team"
+                              className="w-full h-full object-cover rounded-full"
+                              onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                            />
+                          </div>
+                          <div className="text-left min-w-0">
+                            <span className="text-[8px] text-slate-400 uppercase font-rajdhani font-bold block leading-none">
+                              {isSold ? 'Acquired By' : 'Leading Franchise'}
+                            </span>
+                            <span className="text-xs sm:text-sm font-rajdhani font-black text-white uppercase tracking-wide leading-tight truncate block mt-0.5">
+                              {leaderTeamId ? leaderDisplayName : 'AWAITING FIRST BID'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="text-right flex-shrink-0">
+                          <span className="text-[8px] text-slate-400 font-inter uppercase tracking-wider block">
+                            Owner
+                          </span>
+                          <span className="text-xs font-rajdhani font-bold text-amber-300 uppercase">
+                            {leaderOwnerName}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </motion.div>
               )}
             </div>

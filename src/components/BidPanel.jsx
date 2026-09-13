@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { placeBid, MAX_BID_LIMIT, MIN_BASE_PRICE, computeMaxAllowedBid } from '../services/auctionService';
 import { useAllPlayers } from '../hooks/useAllPlayers';
+import { useAllTeams } from '../hooks/useAllTeams';
 import { getTeamFullRoster } from '../config/franchiseCaptains';
 import { getTeamDisplayName, getTeamLogo } from '../config/teamsConfig';
 
@@ -214,6 +215,7 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
   const [bidAmount, setBidAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { players } = useAllPlayers();
+  const { teams: allTeams } = useAllTeams();
   const isSubmittingRef = useRef(false);
 
   const teamBalance    = typeof team?.fire_coin_balance === 'number' && !isNaN(team.fire_coin_balance)
@@ -409,36 +411,46 @@ export function BidPanel({ activePlayer, team, onNotify, auctionPaused, isReveal
           </div>
 
           {/* Leader Info Row with Mascot Logo */}
-          <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              {/* Team Mascot Logo */}
-              <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-black/60 flex-shrink-0 flex items-center justify-center p-0.5 shadow-md">
-                <img
-                  src={getTeamLogo(activePlayer.current_highest_bidder)}
-                  alt="Team Logo"
-                  className="w-full h-full object-cover rounded-full"
-                  onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
-                />
-              </div>
-              <div className="min-w-0">
-                <span className="text-[9px] text-slate-400 uppercase font-rajdhani font-bold block leading-none">
-                  {isSold ? 'Acquired By' : 'Leading Franchise'}
-                </span>
-                <span className="text-sm font-rajdhani font-black text-white truncate block uppercase leading-tight mt-0.5">
-                  {activePlayer.current_highest_bidder
-                    ? getTeamDisplayName(activePlayer.current_highest_bidder, activePlayer.current_highest_bidder_name)
-                    : 'AWAITING FIRST BID'}
-                </span>
-              </div>
-            </div>
+          {(() => {
+            const bidderId = activePlayer.current_highest_bidder;
+            const bidderTeam = (allTeams || []).find(
+              (t) => String(t.id).toLowerCase() === String(bidderId).toLowerCase()
+            );
+            const bidderLogoUrl = bidderTeam?.logo_url || bidderTeam?.logo || getTeamLogo(bidderId);
 
-            {/* Base price reference if no bids */}
-            {!activePlayer.current_highest_bidder && (
-              <span className="text-[10px] text-amber-400/90 font-rajdhani font-bold whitespace-nowrap bg-amber-500/10 px-2 py-1 rounded-md border border-amber-500/20">
-                Base: ₣{Number(activePlayer.base_price ?? 0).toLocaleString()}
-              </span>
-            )}
-          </div>
+            return (
+              <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {/* Team Mascot Logo */}
+                  <div className="w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-black/60 flex-shrink-0 flex items-center justify-center p-0.5 shadow-md">
+                    <img
+                      src={bidderLogoUrl}
+                      alt="Team Logo"
+                      className="w-full h-full object-cover rounded-full"
+                      onError={(e) => { e.currentTarget.src = '/demons_reign_logo.jpg'; }}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[9px] text-slate-400 uppercase font-rajdhani font-bold block leading-none">
+                      {isSold ? 'Acquired By' : 'Leading Franchise'}
+                    </span>
+                    <span className="text-sm font-rajdhani font-black text-white truncate block uppercase leading-tight mt-0.5">
+                      {activePlayer.current_highest_bidder
+                        ? (bidderTeam?.team_name || bidderTeam?.name || getTeamDisplayName(activePlayer.current_highest_bidder, activePlayer.current_highest_bidder_name))
+                        : 'AWAITING FIRST BID'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Base price reference if no bids */}
+                {!activePlayer.current_highest_bidder && (
+                  <span className="text-[10px] text-amber-400/90 font-rajdhani font-bold whitespace-nowrap bg-amber-500/10 px-2 py-1 rounded-md border border-amber-500/20">
+                    Base: ₣{Number(activePlayer.base_price ?? 0).toLocaleString()}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 

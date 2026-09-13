@@ -10,10 +10,10 @@ export function HostTournamentSetup({ onRefresh }) {
   // ─────────────────────────────────────────────────────────────────────────────
   const [teamCount, setTeamCount] = useState(4);
   const [teamSlots, setTeamSlots] = useState(() => [
-    { team_name: 'Team Alpha', owner_name: 'Captain 1', budget: 40000, access_pin: '1001' },
-    { team_name: 'Team Beta', owner_name: 'Captain 2', budget: 40000, access_pin: '1002' },
-    { team_name: 'Team Gamma', owner_name: 'Captain 3', budget: 40000, access_pin: '1003' },
-    { team_name: 'Team Delta', owner_name: 'Captain 4', budget: 40000, access_pin: '1004' },
+    { team_name: 'Team Alpha', owner_name: 'Captain 1', budget: 40000, access_pin: '1001', logoFile: null, logoPreview: null },
+    { team_name: 'Team Beta', owner_name: 'Captain 2', budget: 40000, access_pin: '1002', logoFile: null, logoPreview: null },
+    { team_name: 'Team Gamma', owner_name: 'Captain 3', budget: 40000, access_pin: '1003', logoFile: null, logoPreview: null },
+    { team_name: 'Team Delta', owner_name: 'Captain 4', budget: 40000, access_pin: '1004', logoFile: null, logoPreview: null },
   ]);
   const [savingTeams, setSavingTeams] = useState(false);
   const [teamSaveMsg, setTeamSaveMsg] = useState(null);
@@ -38,6 +38,8 @@ export function HostTournamentSetup({ onRefresh }) {
             owner_name: `Owner ${i + 1}`,
             budget: 40000,
             access_pin: Math.floor(1000 + Math.random() * 9000).toString(),
+            logoFile: null,
+            logoPreview: null,
           });
         }
       }
@@ -49,6 +51,20 @@ export function HostTournamentSetup({ onRefresh }) {
     setTeamSlots((prev) => {
       const copy = [...prev];
       copy[index] = { ...copy[index], [field]: value };
+      return copy;
+    });
+  };
+
+  const handleSlotLogoChange = (index, file) => {
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    setTeamSlots((prev) => {
+      const copy = [...prev];
+      copy[index] = {
+        ...copy[index],
+        logoFile: file,
+        logoPreview: previewUrl,
+      };
       return copy;
     });
   };
@@ -83,28 +99,114 @@ export function HostTournamentSetup({ onRefresh }) {
         }
       }
 
-      const rowsToInsert = teamSlots.map((slot) => ({
-        team_name: slot.team_name.trim(),
-        owner_name: slot.owner_name.trim(),
-        budget: Number(slot.budget) || 40000,
-        remaining_budget: Number(slot.budget) || 40000,
-        fire_coin_balance: Number(slot.budget) || 40000,
-        access_pin: String(slot.access_pin).trim().slice(0, 6),
-        matches_played: 0,
-        wins: 0,
-        losses: 0,
-        score_diff: 0,
-        points: 0,
-      }));
+      // 1. Upload logos to Supabase Storage 'team-logos' bucket
+      const uploadedLogos = await Promise.all(
+        teamSlots.map(async (slot, idx) => {
+          if (!slot.logoFile) return null;
+          try {
+            const ext = slot.logoFile.name.split('.').pop() || 'png';
+            const cleanTeamName = slot.team_name.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+            const fileName = `${cleanTeamName}_${Date.now()}_${idx}.${ext}`;
 
-      const { data, error } = await supabase
+            const { data: uploadData, error: uploadErr } = await supabase.storage
+              .from('team-logos')
+              .upload(fileName, slot.logoFile, {
+                cacheControl: '3600',
+                upsert: true,
+              });
+
+            if (uploadErr) {
+              console.warn(`Could not upload logo for team ${slot.team_name}:`, uploadErr);
+              return null;
+            }
+
+            const { data: publicUrlData } = supabase.storage
+              .from('team-logos')
+              .getPublicUrl(fileName);
+
+            return publicUrlData?.publicUrl || null;
+          } catch (storageErr) {
+            console.warn(`Storage exception for team ${slot.team_name}:`, storageErr);
+            return null;
+          }
+        })
+      );
+
+      // Build primary modern payload
+      const modernRows = teamSlots.map((slot, idx) => {
+        const teamId = 'team_' + slot.team_name.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).substring(2, 6);
+        const row = {
+          id: teamId,
+          team_name: slot.team_name.trim(),
+          owner_name: slot.owner_name.trim(),
+          budget: Number(slot.budget) || 40000,
+          remaining_budget: Number(slot.budget) || 40000,
+          fire_coin_balance: Number(slot.budget) || 40000,
+          access_pin: String(slot.access_pin).trim().slice(0, 6),
+          matches_played: 0,
+          wins: 0,
+          losses: 0,
+          score_diff: 0,
+          points: 0,
+        };
+
+        const uploadedUrl = uploadedLogos[idx];
+        if (uploadedUrl) row.logo_url = uploadedUrl;
+        return row;
+      });
+
+      // Try inserting modern format
+      let { data, error } = await supabase
         .from('teams')
-        .insert(rowsToInsert)
+        .insert(modernRows)
         .select();
 
-      if (error) throw error;
+      // If database has legacy columns (name, owner, password) or missing access_pin/logo_url
+      if (error && (error.code === 'PGRST204' || error.message?.includes('column') || error.code === '23502')) {
+        console.warn('Modern schema insert failed. Falling back to legacy schema columns (name, owner, password)...', error.message);
+        const legacyRows = teamSlots.map((slot, idx) => {
+          const teamId = 'team_' + slot.team_name.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.random().toString(36).substring(2, 6);
+          const legacyRow = {
+            id: teamId,
+            name: slot.team_name.trim(),
+            owner: slot.owner_name.trim(),
+            fire_coin_balance: Number(slot.budget) || 40000,
+            password: String(slot.access_pin).trim(),
+            matches_played: 0,
+            wins: 0,
+            losses: 0,
+            score_diff: 0,
+            points: 0,
+          };
 
-      setTeamSaveMsg({ ok: true, text: `Successfully registered ${rowsToInsert.length} teams!` });
+          const uploadedUrl = uploadedLogos[idx];
+          if (uploadedUrl) legacyRow.logo_url = uploadedUrl;
+          return legacyRow;
+        });
+
+        const retryResult = await supabase
+          .from('teams')
+          .insert(legacyRows)
+          .select();
+
+        // If logo_url is also not in schema yet, retry without logo_url
+        if (retryResult.error && retryResult.error.code === 'PGRST204') {
+          const cleanLegacyRows = legacyRows.map(({ logo_url, ...rest }) => rest);
+          const finalRetry = await supabase.from('teams').insert(cleanLegacyRows).select();
+          if (finalRetry.error) throw finalRetry.error;
+          data = finalRetry.data;
+          error = null;
+        } else if (retryResult.error) {
+          throw retryResult.error;
+        } else {
+          data = retryResult.data;
+          error = null;
+        }
+      } else if (error) {
+        throw error;
+      }
+
+      setTeamSaveMsg({ ok: true, text: `Successfully registered ${teamSlots.length} teams!` });
       await refetchTeams();
       onRefresh?.();
       setTimeout(() => setTeamSaveMsg(null), 4000);
@@ -197,23 +299,66 @@ export function HostTournamentSetup({ onRefresh }) {
       const baseBid = Number(stagingPlayer.basePrice) || 1000;
       const increment = Number(stagingPlayer.bidIncrement) || 500;
 
+      // Ensure player row exists in players table for broadcast/overlay compatibility
+      let playerId = null;
+      try {
+        const { data: existingPlayer } = await supabase
+          .from('players')
+          .select('id')
+          .eq('name', stagingPlayer.name.trim())
+          .maybeSingle();
+
+        if (existingPlayer?.id) {
+          playerId = existingPlayer.id;
+        } else {
+          const { data: newPlayer } = await supabase
+            .from('players')
+            .insert({
+              name: stagingPlayer.name.trim(),
+              role: stagingPlayer.role,
+              base_price: baseBid,
+              status: 'active',
+            })
+            .select('id')
+            .maybeSingle();
+          if (newPlayer?.id) playerId = newPlayer.id;
+        }
+      } catch (pErr) {
+        console.warn('Player staging note (schema fallback):', pErr);
+      }
+
       const payload = {
         id: 1,
         status: 'idle',
+        active_player_id: playerId,
         current_player_name: stagingPlayer.name.trim(),
         current_player_role: stagingPlayer.role,
         base_bid: baseBid,
         current_bid: 0,
         highest_bidder_id: null,
+        highest_bidder_team_id: null,
         bid_increment: increment,
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
-        .from('auction_state')
-        .upsert(payload, { onConflict: 'id' });
-
-      if (error) throw error;
+      // Try upserting complete payload; fallback if custom columns don't exist
+      try {
+        const { error } = await supabase
+          .from('auction_state')
+          .upsert(payload, { onConflict: 'id' });
+        if (error) throw error;
+      } catch (upErr) {
+        // Fallback for strict schemas
+        const fallbackPayload = {
+          id: 1,
+          status: 'idle',
+          current_bid: 0,
+          highest_bidder_team_id: null,
+          updated_at: new Date().toISOString(),
+        };
+        if (playerId) fallbackPayload.active_player_id = playerId;
+        await supabase.from('auction_state').upsert(fallbackPayload, { onConflict: 'id' });
+      }
 
       setControllerMsg({ ok: true, text: `Staged: ${stagingPlayer.name} (${stagingPlayer.role})` });
       setTimeout(() => setControllerMsg(null), 3500);
@@ -560,6 +705,39 @@ export function HostTournamentSetup({ onRefresh }) {
                       />
                     </div>
                   </div>
+
+                  {/* Team Logo Image Upload */}
+                  <div className="pt-2 border-t border-surface-800">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[10px] uppercase font-bold text-slate-400">
+                        Team Logo / Emblem
+                      </label>
+                      {slot.logoFile && (
+                        <span className="text-[9px] font-mono text-emerald-400 font-bold">Selected</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {slot.logoPreview ? (
+                        <div className="w-9 h-9 rounded-lg bg-black/60 border border-amber-500/40 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                          <img
+                            src={slot.logoPreview}
+                            alt="Logo preview"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-9 h-9 rounded-lg bg-surface-800 border border-surface-700 flex items-center justify-center text-xs text-slate-500 flex-shrink-0">
+                          🛡️
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleSlotLogoChange(idx, e.target.files?.[0] || null)}
+                        className="block w-full text-[11px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-bold file:uppercase file:bg-surface-700 file:text-slate-200 hover:file:bg-surface-600 cursor-pointer"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -854,6 +1032,7 @@ export function HostTournamentSetup({ onRefresh }) {
             <thead>
               <tr className="border-b border-surface-700 text-slate-400 uppercase text-[10px] tracking-wider print:border-black print:text-black">
                 <th className="py-2.5 px-3">#</th>
+                <th className="py-2.5 px-3">Logo</th>
                 <th className="py-2.5 px-3">Team Name</th>
                 <th className="py-2.5 px-3">Owner Name</th>
                 <th className="py-2.5 px-3">Starting Budget</th>
@@ -867,6 +1046,7 @@ export function HostTournamentSetup({ onRefresh }) {
                 const pin = t.access_pin || '1234';
                 const startingBudget = t.budget || 40000;
                 const remainingBudget = t.remaining_budget ?? t.fire_coin_balance ?? startingBudget;
+                const logoSrc = t.logo_url || t.logoPreview || null;
 
                 return (
                   <tr
@@ -875,6 +1055,17 @@ export function HostTournamentSetup({ onRefresh }) {
                   >
                     <td className="py-3 px-3 text-slate-500 font-mono print:text-black">
                       {String(idx + 1).padStart(2, '0')}
+                    </td>
+                    <td className="py-3 px-3">
+                      {logoSrc ? (
+                        <div className="w-7 h-7 rounded-lg overflow-hidden border border-surface-600 bg-black flex items-center justify-center flex-shrink-0">
+                          <img src={logoSrc} alt="logo" className="w-full h-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="w-7 h-7 rounded-lg border border-surface-700/60 bg-surface-800 text-[10px] flex items-center justify-center text-slate-500">
+                          🛡️
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-3 uppercase text-white font-black print:text-black">
                       {t.team_name || t.name}
