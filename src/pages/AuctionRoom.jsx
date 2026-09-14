@@ -47,7 +47,7 @@ export default function AuctionRoom() {
   const displayTeam = liveTeam || effectiveTeam;
 
   return (
-    <div className="min-h-screen bg-surface-gradient flex flex-col">
+    <div className="min-h-screen bg-transparent flex flex-col">
 
       {/* ── Top Nav ────────────────────────────────────────────────────────── */}
       <nav className="flex items-center justify-between px-5 py-3.5

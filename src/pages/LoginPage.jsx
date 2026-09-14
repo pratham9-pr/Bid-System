@@ -6,7 +6,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen w-full bg-surface-gradient flex flex-col justify-between relative overflow-x-hidden">
+    <div className="min-h-screen w-full bg-transparent flex flex-col justify-between relative overflow-x-hidden">
       {/* ── Ambient Background Lighting ───────────────────────────────── */}
       <div className="absolute top-1/6 left-1/12 w-[35rem] h-[35rem] rounded-full bg-fire-600/10 blur-[150px] pointer-events-none" />
       <div className="absolute bottom-1/6 right-1/12 w-[35rem] h-[35rem] rounded-full bg-amber-500/10 blur-[150px] pointer-events-none" />

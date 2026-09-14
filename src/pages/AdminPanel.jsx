@@ -75,7 +75,7 @@ export default function AdminPanel() {
     .sort((a, b) => (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9));
 
   return (
-    <div className="min-h-screen bg-surface-gradient flex flex-col">
+    <div className="min-h-screen bg-transparent flex flex-col">
 
       {/* ── Nav ─────────────────────────────────────────────────────────── */}
       <nav className="flex items-center justify-between px-5 py-3.5

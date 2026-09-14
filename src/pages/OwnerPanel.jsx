@@ -319,7 +319,7 @@ export default function OwnerPanel() {
   // ─────────────────────────────────────────────────────────────────────────────
   if (!authenticatedTeam) {
     return (
-      <div className="min-h-screen bg-[#07090e] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-surface-900 via-[#07090e] to-black flex items-center justify-center p-4">
+      <div className="min-h-screen bg-transparent flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-surface-900/90 border border-surface-700/60 rounded-3xl p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
           {/* Accent glow */}
           <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -423,7 +423,7 @@ export default function OwnerPanel() {
     authenticatedTeam.logo_url || authenticatedTeam.logo || null;
 
   return (
-    <div className="min-h-screen bg-[#06070c] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-surface-900/60 via-[#06070c] to-black text-slate-100 flex flex-col font-inter">
+    <div className="min-h-screen bg-transparent text-slate-100 flex flex-col font-inter">
       {/* ── Top Header Navigation ── */}
       <header className="border-b border-surface-700/50 bg-surface-900/80 backdrop-blur-md sticky top-0 z-30 px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-4">

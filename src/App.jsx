@@ -7,6 +7,7 @@ import AdminPanel       from './pages/AdminPanel';
 import BroadcastOverlay from './pages/BroadcastOverlay';
 import PointsTableLeaderboard from './pages/PointsTableLeaderboard';
 import OwnerPanel from './pages/OwnerPanel';
+import { FluidBackground } from './components/FluidBackground';
 
 // ─── Global Error Boundary ───────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
@@ -101,6 +102,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
+        <FluidBackground />
         <BrowserRouter>
           <Routes>
             {/* Unified Passkey Login at Root (/) */}
